@@ -99,11 +99,11 @@ schannel_connect_step1(struct connectdata *conn, int sockindex) {
   schannel_cred.dwFlags = SCH_CRED_AUTO_CRED_VALIDATION |
                           SCH_CRED_REVOCATION_CHECK_CHAIN;
 
-  if(Curl_inet_pton(AF_INET, conn->host.name, &addr)
+  if(Curl_inet_pton(AF_INET, conn->host.name, &addr) ||
 #ifdef ENABLE_IPV6
-  || Curl_inet_pton(AF_INET6, conn->host.name, &addr6)
+     Curl_inet_pton(AF_INET6, conn->host.name, &addr6) ||
 #endif
-     ) {
+     data->set.ssl.verifyhost < 2) {
     schannel_cred.dwFlags |= SCH_CRED_NO_SERVERNAME_CHECK;
     infof(data, "schannel: using IP address, disable SNI servername check\n");
   }
