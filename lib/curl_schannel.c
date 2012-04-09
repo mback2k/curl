@@ -358,12 +358,10 @@ schannel_connect_step2(struct connectdata *conn, int sockindex) {
 
   /* check if the handshake is complete */
   if(sspi_status == SEC_E_OK) {
-    infof(data, "schannel: handshake complete\n");
-
     /* TODO: implement verification results */
 
     connssl->connecting_state = ssl_connect_3;
-    infof(data, "SSL connected\n");
+    infof(data, "schannel: handshake complete\n");
   }
 
   return CURLE_OK;
