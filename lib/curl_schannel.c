@@ -40,10 +40,8 @@
  * TODO list for TLS/SSL implementation:
  * - implement session handling and re-use
  * - implement write buffering
- * - implement verification options
- * - implement verification results
  * - implement SSL/TLS shutdown
- * - special cases: negotiation, certificates, algorithms
+ * - special cases: renegotiation, certificates, algorithms
  */
 
 #include "setup.h"
@@ -131,8 +129,6 @@ schannel_connect_step1(struct connectdata *conn, int sockindex) {
       schannel_cred.grbitEnabledProtocols = SP_PROT_SSL2_CLIENT;
       break;
   }
-
-  /* TODO: implement verification options */
 
   /* http://msdn.microsoft.com/en-us/library/windows/desktop/aa374716.aspx */
   sspi_status = s_pSecFn->AcquireCredentialsHandleA(NULL,
@@ -358,8 +354,6 @@ schannel_connect_step2(struct connectdata *conn, int sockindex) {
 
   /* check if the handshake is complete */
   if(sspi_status == SEC_E_OK) {
-    /* TODO: implement verification results */
-
     connssl->connecting_state = ssl_connect_3;
     infof(data, "schannel: handshake complete\n");
   }
