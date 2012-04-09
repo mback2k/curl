@@ -54,15 +54,12 @@
 #include <schnlsp.h>
 
 #include "urldata.h"
-#include "sendf.h"
-#include "inet_pton.h"
 #include "curl_sspi.h"
 #include "curl_schannel.h"
 #include "sslgen.h"
-#include "parsedate.h"
+#include "sendf.h"
 #include "connect.h" /* for the connect timeout */
-#include "select.h"
-#include "rawstr.h"
+#include "select.h" /* for the socket readyness */
 
 #define _MPRINTF_REPLACE /* use our functions only */
 #include <curl/mprintf.h>
