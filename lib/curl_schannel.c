@@ -140,8 +140,12 @@ schannel_connect_step1(struct connectdata *conn, int sockindex) {
     &connssl->cred_handle, &connssl->time_stamp);
 
   if(sspi_status != SEC_E_OK) {
-    failf(data, "schannel: AcquireCredentialsHandleA failed: %d\n",
-          sspi_status);
+    if(sspi_status == SEC_E_WRONG_PRINCIPAL)
+      failf(data, "schannel: SNI or certificate check failed\n",
+            sspi_status);
+    else
+      failf(data, "schannel: AcquireCredentialsHandleA failed: %d\n",
+            sspi_status);
     return CURLE_SSL_CONNECT_ERROR;
   }
 
@@ -169,8 +173,12 @@ schannel_connect_step1(struct connectdata *conn, int sockindex) {
     &connssl->ret_flags, &connssl->time_stamp);
 
   if(sspi_status != SEC_I_CONTINUE_NEEDED) {
-    failf(data, "schannel: initial InitializeSecurityContextA failed: %d\n",
-          sspi_status);
+    if(sspi_status == SEC_E_WRONG_PRINCIPAL)
+      failf(data, "schannel: SNI or certificate check failed\n",
+            sspi_status);
+    else
+      failf(data, "schannel: initial InitializeSecurityContextA failed: %d\n",
+            sspi_status);
     return CURLE_SSL_CONNECT_ERROR;
   }
 
@@ -319,8 +327,12 @@ schannel_connect_step2(struct connectdata *conn, int sockindex) {
     }
   }
   else {
-    failf(data, "schannel: next InitializeSecurityContextA failed: %d\n",
-          sspi_status);
+    if(sspi_status == SEC_E_WRONG_PRINCIPAL)
+      failf(data, "schannel: SNI or certificate check failed\n",
+            sspi_status);
+    else
+      failf(data, "schannel: next InitializeSecurityContextA failed: %d\n",
+            sspi_status);
     return CURLE_SSL_CONNECT_ERROR;
   }
 
