@@ -60,6 +60,7 @@
 #include "sendf.h"
 #include "connect.h" /* for the connect timeout */
 #include "select.h" /* for the socket readyness */
+#include "inet_pton.h" /* for IP addr SNI check */
 
 #define _MPRINTF_REPLACE /* use our functions only */
 #include <curl/mprintf.h>
@@ -84,6 +85,10 @@ schannel_connect_step1(struct connectdata *conn, int sockindex) {
   SecBufferDesc outbuf_desc;
   SCHANNEL_CRED schannel_cred;
   SECURITY_STATUS sspi_status = SEC_E_OK;
+  struct in_addr addr;
+#ifdef ENABLE_IPV6
+  struct in6_addr addr6;
+#endif
 
   infof(data, "schannel: Connecting to %s:%d (step 1/3)\n",
         conn->host.name, conn->remote_port);
@@ -93,6 +98,15 @@ schannel_connect_step1(struct connectdata *conn, int sockindex) {
   schannel_cred.dwVersion = SCHANNEL_CRED_VERSION;
   schannel_cred.dwFlags = SCH_CRED_AUTO_CRED_VALIDATION |
                           SCH_CRED_REVOCATION_CHECK_CHAIN;
+
+  if(Curl_inet_pton(AF_INET, conn->host.name, &addr)
+#ifdef ENABLE_IPV6
+  || Curl_inet_pton(AF_INET6, conn->host.name, &addr6)
+#endif
+     ) {
+    schannel_cred.dwFlags |= SCH_CRED_NO_SERVERNAME_CHECK;
+    infof(data, "schannel: using IP address, disable SNI servername check\n");
+  }
 
   switch(data->set.ssl.version) {
     case CURL_SSLVERSION_TLSv1:
