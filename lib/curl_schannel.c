@@ -368,7 +368,7 @@ schannel_connect_step3(struct connectdata *conn, int sockindex) {
 
   DEBUGASSERT(ssl_connect_3 == connssl->connecting_state);
 
-  if (connssl->ret_flags != connssl->req_flags) {
+  if(connssl->ret_flags != connssl->req_flags) {
     if(!(connssl->ret_flags & ISC_RET_SEQUENCE_DETECT))
       failf(data, "schannel: failed to setup sequence detection\n");
     if(!(connssl->ret_flags & ISC_RET_REPLAY_DETECT))
