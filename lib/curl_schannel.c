@@ -161,9 +161,8 @@ schannel_connect_step1(struct connectdata *conn, int sockindex) {
 
   /* setup request flags */
   connssl->req_flags = ISC_REQ_SEQUENCE_DETECT | ISC_REQ_REPLAY_DETECT |
-                       ISC_REQ_CONFIDENTIALITY | ISC_REQ_INTEGRITY |
-                       ISC_REQ_EXTENDED_ERROR | ISC_REQ_ALLOCATE_MEMORY |
-                       ISC_REQ_STREAM;
+                       ISC_REQ_CONFIDENTIALITY | ISC_REQ_EXTENDED_ERROR |
+                       ISC_REQ_ALLOCATE_MEMORY | ISC_REQ_STREAM;
 
   /* http://msdn.microsoft.com/en-us/library/windows/desktop/aa375924.aspx */
   sspi_status = s_pSecFn->InitializeSecurityContextA(&connssl->cred_handle,
