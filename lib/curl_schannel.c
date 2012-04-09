@@ -331,7 +331,7 @@ schannel_connect_step2(struct connectdata *conn, int sockindex) {
     /* check if the remaining data is less than the total amount
      * and therefore begins after the already processed data
      */
-    if (connssl->encdata_offset > inbuf[1].cbBuffer) {
+    if(connssl->encdata_offset > inbuf[1].cbBuffer) {
       memmove(connssl->encdata_buffer,
               (connssl->encdata_buffer + connssl->encdata_offset) -
                 inbuf[1].cbBuffer, inbuf[1].cbBuffer);
@@ -622,7 +622,7 @@ schannel_recv(struct connectdata *conn, int sockindex,
   infof(data, "schannel: encrypted data buffer %d/%d\n",
         connssl->encdata_offset, connssl->encdata_length);
   size = connssl->encdata_length - connssl->encdata_offset;
-  if (size > 0) {
+  if(size > 0) {
     read = sread(conn->sock[sockindex],
                  connssl->encdata_buffer + connssl->encdata_offset, size);
     infof(data, "schannel: encrypted data received %d\n", read);
