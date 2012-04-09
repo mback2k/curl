@@ -83,6 +83,8 @@ schannel_connect_step1(struct connectdata *conn, int sockindex) {
   SecBufferDesc outbuf_desc;
   SCHANNEL_CRED schannel_cred;
   SECURITY_STATUS sspi_status = SEC_E_OK;
+  CredHandle *old_cred_handle = NULL;
+  size_t old_cred_handle_size = 0;
   struct in_addr addr;
 #ifdef ENABLE_IPV6
   struct in6_addr addr6;
@@ -91,57 +93,63 @@ schannel_connect_step1(struct connectdata *conn, int sockindex) {
   infof(data, "schannel: Connecting to %s:%d (step 1/3)\n",
         conn->host.name, conn->remote_port);
 
-  /* setup Schannel API options */
-  memset(&schannel_cred, 0, sizeof(schannel_cred));
-  schannel_cred.dwVersion = SCHANNEL_CRED_VERSION;
-
-  if(data->set.ssl.verifypeer) {
-    schannel_cred.dwFlags = SCH_CRED_AUTO_CRED_VALIDATION |
-                            SCH_CRED_REVOCATION_CHECK_CHAIN;
-    infof(data, "schannel: checking server certificate and revocation\n");
+  if(!Curl_ssl_getsessionid(conn, &old_cred_handle, &old_cred_handle_size)) {
+    memcpy(&connssl->cred_handle, old_cred_handle, old_cred_handle_size);
+    infof(data, "schannel: re-using existing credential handle\n");
   }
   else {
-    schannel_cred.dwFlags = SCH_CRED_MANUAL_CRED_VALIDATION |
-                            SCH_CRED_IGNORE_NO_REVOCATION_CHECK |
-                            SCH_CRED_IGNORE_REVOCATION_OFFLINE;
-    infof(data, "schannel: disable server certificate and revocation checks\n");
-  }
+    /* setup Schannel API options */
+    memset(&schannel_cred, 0, sizeof(schannel_cred));
+    schannel_cred.dwVersion = SCHANNEL_CRED_VERSION;
 
-  if(Curl_inet_pton(AF_INET, conn->host.name, &addr) ||
+    if(data->set.ssl.verifypeer) {
+      schannel_cred.dwFlags = SCH_CRED_AUTO_CRED_VALIDATION |
+                              SCH_CRED_REVOCATION_CHECK_CHAIN;
+      infof(data, "schannel: checking server certificate and revocation\n");
+    }
+    else {
+      schannel_cred.dwFlags = SCH_CRED_MANUAL_CRED_VALIDATION |
+                              SCH_CRED_IGNORE_NO_REVOCATION_CHECK |
+                              SCH_CRED_IGNORE_REVOCATION_OFFLINE;
+      infof(data, "schannel: disable server certificate and revocation checks\n");
+    }
+
+    if(Curl_inet_pton(AF_INET, conn->host.name, &addr) ||
 #ifdef ENABLE_IPV6
-     Curl_inet_pton(AF_INET6, conn->host.name, &addr6) ||
+       Curl_inet_pton(AF_INET6, conn->host.name, &addr6) ||
 #endif
-     data->set.ssl.verifyhost < 2) {
-    schannel_cred.dwFlags |= SCH_CRED_NO_SERVERNAME_CHECK;
-    infof(data, "schannel: using IP address, disable SNI servername check\n");
-  }
+       data->set.ssl.verifyhost < 2) {
+      schannel_cred.dwFlags |= SCH_CRED_NO_SERVERNAME_CHECK;
+      infof(data, "schannel: using IP address, disable SNI servername check\n");
+    }
 
-  switch(data->set.ssl.version) {
-    case CURL_SSLVERSION_TLSv1:
-      schannel_cred.grbitEnabledProtocols = SP_PROT_TLS1_0_CLIENT |
-                                            SP_PROT_TLS1_1_CLIENT |
-                                            SP_PROT_TLS1_2_CLIENT;
-      break;
-    case CURL_SSLVERSION_SSLv3:
-      schannel_cred.grbitEnabledProtocols = SP_PROT_SSL3_CLIENT;
-      break;
-    case CURL_SSLVERSION_SSLv2:
-      schannel_cred.grbitEnabledProtocols = SP_PROT_SSL2_CLIENT;
-      break;
-  }
+    switch(data->set.ssl.version) {
+      case CURL_SSLVERSION_TLSv1:
+        schannel_cred.grbitEnabledProtocols = SP_PROT_TLS1_0_CLIENT |
+                                              SP_PROT_TLS1_1_CLIENT |
+                                              SP_PROT_TLS1_2_CLIENT;
+        break;
+      case CURL_SSLVERSION_SSLv3:
+        schannel_cred.grbitEnabledProtocols = SP_PROT_SSL3_CLIENT;
+        break;
+      case CURL_SSLVERSION_SSLv2:
+        schannel_cred.grbitEnabledProtocols = SP_PROT_SSL2_CLIENT;
+        break;
+    }
 
-  /* http://msdn.microsoft.com/en-us/library/windows/desktop/aa374716.aspx */
-  sspi_status = s_pSecFn->AcquireCredentialsHandleA(NULL,
-    UNISP_NAME_A, SECPKG_CRED_OUTBOUND, NULL, &schannel_cred,
-    NULL, NULL, &connssl->cred_handle, &connssl->time_stamp);
+    /* http://msdn.microsoft.com/en-us/library/windows/desktop/aa374716.aspx */
+    sspi_status = s_pSecFn->AcquireCredentialsHandleA(NULL,
+      UNISP_NAME_A, SECPKG_CRED_OUTBOUND, NULL, &schannel_cred,
+      NULL, NULL, &connssl->cred_handle, &connssl->time_stamp);
 
-  if(sspi_status != SEC_E_OK) {
-    if(sspi_status == SEC_E_WRONG_PRINCIPAL)
-      failf(data, "schannel: SNI or certificate check failed\n");
-    else
-      failf(data, "schannel: AcquireCredentialsHandleA failed: %d\n",
-            sspi_status);
-    return CURLE_SSL_CONNECT_ERROR;
+    if(sspi_status != SEC_E_OK) {
+      if(sspi_status == SEC_E_WRONG_PRINCIPAL)
+        failf(data, "schannel: SNI or certificate check failed\n");
+      else
+        failf(data, "schannel: AcquireCredentialsHandleA failed: %d\n",
+              sspi_status);
+      return CURLE_SSL_CONNECT_ERROR;
+    }
   }
 
   connssl->schannel = TRUE;
@@ -363,11 +371,17 @@ schannel_connect_step2(struct connectdata *conn, int sockindex) {
 
 static CURLcode
 schannel_connect_step3(struct connectdata *conn, int sockindex) {
+  CURLcode retcode = CURLE_OK;
   struct SessionHandle *data = conn->data;
   struct ssl_connect_data *connssl = &conn->ssl[sockindex];
+  CredHandle *our_cred_handle = &conn->ssl[sockindex].cred_handle;
+  CredHandle *old_cred_handle = NULL;
+  CredHandle *new_cred_handle = NULL;
+  int incache;
 
   DEBUGASSERT(ssl_connect_3 == connssl->connecting_state);
 
+  /* check if the required context attributes are met */
   if(connssl->ret_flags != connssl->req_flags) {
     if(!(connssl->ret_flags & ISC_RET_SEQUENCE_DETECT))
       failf(data, "schannel: failed to setup sequence detection\n");
@@ -382,6 +396,31 @@ schannel_connect_step3(struct connectdata *conn, int sockindex) {
     if(!(connssl->ret_flags & ISC_RET_STREAM))
       failf(data, "schannel: failed to setup stream orientation\n");
     return CURLE_SSL_CONNECT_ERROR;
+  }
+
+  /* save the current session data for possible re-use */
+  incache = !(Curl_ssl_getsessionid(conn, &old_cred_handle, NULL));
+  if(incache) {
+    if(old_cred_handle != our_cred_handle) {
+      infof(data, "schannel: old credential handle is stale, removing\n");
+      Curl_ssl_delsessionid(conn, old_cred_handle);
+      incache = FALSE;
+    }
+  }
+  if(!incache) {
+    new_cred_handle = malloc(sizeof(CredHandle));
+    if(new_cred_handle) {
+      memcpy(new_cred_handle, our_cred_handle, sizeof(CredHandle));
+      retcode = Curl_ssl_addsessionid(conn,
+                                      new_cred_handle, sizeof(CredHandle));
+    }
+    else {
+      retcode = CURLE_OUT_OF_MEMORY;
+    }
+    if(retcode) {
+      failf(data, "schannel: failed to store credential handle\n");
+      return retcode;
+    }
   }
 
   connssl->connecting_state = ssl_connect_done;
