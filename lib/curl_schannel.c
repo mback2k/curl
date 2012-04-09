@@ -141,8 +141,7 @@ schannel_connect_step1(struct connectdata *conn, int sockindex) {
 
   if(sspi_status != SEC_E_OK) {
     if(sspi_status == SEC_E_WRONG_PRINCIPAL)
-      failf(data, "schannel: SNI or certificate check failed\n",
-            sspi_status);
+      failf(data, "schannel: SNI or certificate check failed\n");
     else
       failf(data, "schannel: AcquireCredentialsHandleA failed: %d\n",
             sspi_status);
@@ -174,8 +173,7 @@ schannel_connect_step1(struct connectdata *conn, int sockindex) {
 
   if(sspi_status != SEC_I_CONTINUE_NEEDED) {
     if(sspi_status == SEC_E_WRONG_PRINCIPAL)
-      failf(data, "schannel: SNI or certificate check failed\n",
-            sspi_status);
+      failf(data, "schannel: SNI or certificate check failed\n");
     else
       failf(data, "schannel: initial InitializeSecurityContextA failed: %d\n",
             sspi_status);
@@ -328,8 +326,7 @@ schannel_connect_step2(struct connectdata *conn, int sockindex) {
   }
   else {
     if(sspi_status == SEC_E_WRONG_PRINCIPAL)
-      failf(data, "schannel: SNI or certificate check failed\n",
-            sspi_status);
+      failf(data, "schannel: SNI or certificate check failed\n");
     else
       failf(data, "schannel: next InitializeSecurityContextA failed: %d\n",
             sspi_status);
