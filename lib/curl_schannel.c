@@ -135,9 +135,9 @@ schannel_connect_step1(struct connectdata *conn, int sockindex) {
   /* TODO: implement verification options */
 
   /* http://msdn.microsoft.com/en-us/library/windows/desktop/aa374716.aspx */
-  sspi_status = s_pSecFn->AcquireCredentialsHandleA(NULL, SSPI_SCHANNEL_API,
-    SECPKG_CRED_OUTBOUND, NULL, &schannel_cred, NULL, NULL,
-    &connssl->cred_handle, &connssl->time_stamp);
+  sspi_status = s_pSecFn->AcquireCredentialsHandleA(NULL,
+    UNISP_NAME_A, SECPKG_CRED_OUTBOUND, NULL, &schannel_cred,
+    NULL, NULL, &connssl->cred_handle, &connssl->time_stamp);
 
   if(sspi_status != SEC_E_OK) {
     if(sspi_status == SEC_E_WRONG_PRINCIPAL)
