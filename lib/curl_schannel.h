@@ -26,7 +26,9 @@
 #ifdef USE_WINDOWS_SSPI
 #ifdef USE_SCHANNEL
 
-#define SSPI_SCHANNEL_API "Microsoft Unified Security Protocol Provider"
+#ifndef UNISP_NAME_A
+#define UNISP_NAME_A "Microsoft Unified Security Protocol Provider"
+#endif
 
 CURLcode Curl_schannel_connect(struct connectdata *conn, int sockindex);
 
