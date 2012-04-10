@@ -826,7 +826,9 @@ schannel_recv(struct connectdata *conn, int sockindex,
   }
 
   /* check if the server closed the connection */
-  if(ret <= 0 && sspi_status == SEC_I_CONTEXT_EXPIRED) {
+  if(ret <= 0 && ( /* special check for Windows 2000 Professional */
+      sspi_status == SEC_I_CONTEXT_EXPIRED || (sspi_status == SEC_E_OK &&
+        connssl->encdata_offset > 0 && connssl->encdata_buffer[0] == 0x15))) {
     infof(data, "schannel: server closed the connection\n");
     *err = CURLE_OK;
     return 0;
