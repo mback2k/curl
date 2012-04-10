@@ -662,7 +662,7 @@ schannel_recv(struct connectdata *conn, int sockindex,
     }
   }
 
-  /* increase buffers in order to fit the requested amount of data */
+  /* increase buffer in order to fit the requested amount of data */
   while(connssl->encdata_length - connssl->encdata_offset < 2048 ||
         connssl->encdata_length < len) {
     /* increase internal encrypted data buffer */
@@ -670,16 +670,6 @@ schannel_recv(struct connectdata *conn, int sockindex,
     connssl->encdata_buffer = realloc(connssl->encdata_buffer,
                                       connssl->encdata_length);
     if(connssl->encdata_buffer == NULL) {
-      failf(data, "schannel: unable to re-allocate memory");
-      *err = CURLE_OUT_OF_MEMORY;
-      return -1;
-    }
-
-    /* increase internal decrypted data buffer */
-    connssl->decdata_length += 2048;
-    connssl->decdata_buffer = realloc(connssl->decdata_buffer,
-                                      connssl->decdata_length);
-    if(connssl->decdata_buffer == NULL) {
       failf(data, "schannel: unable to re-allocate memory");
       *err = CURLE_OUT_OF_MEMORY;
       return -1;
@@ -754,9 +744,23 @@ schannel_recv(struct connectdata *conn, int sockindex,
       if(inbuf[1].BufferType == SECBUFFER_DATA) {
         infof(data, "schannel: decrypted data length: %d\n", inbuf[1].cbBuffer);
 
+        /* increase buffer in order to fit the received amount of data */
+        size = inbuf[1].cbBuffer > 2048 ? inbuf[1].cbBuffer : 2048;
+        while(connssl->decdata_length - connssl->decdata_offset < size ||
+              connssl->decdata_length < len) {
+          /* increase internal decrypted data buffer */
+          connssl->decdata_length += size;
+          connssl->decdata_buffer = realloc(connssl->decdata_buffer,
+                                            connssl->decdata_length);
+          if(connssl->decdata_buffer == NULL) {
+            failf(data, "schannel: unable to re-allocate memory");
+            *err = CURLE_OUT_OF_MEMORY;
+            return -1;
+          }
+        }
+
         /* copy decrypted data to internal buffer */
-        size = connssl->decdata_length - connssl->decdata_offset;
-        size = size < inbuf[1].cbBuffer ? size : inbuf[1].cbBuffer;
+        size = inbuf[1].cbBuffer;
         if(size > 0) {
           memcpy(connssl->decdata_buffer + connssl->decdata_offset,
                  inbuf[1].pvBuffer, size);
