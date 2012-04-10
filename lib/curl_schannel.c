@@ -88,7 +88,7 @@ schannel_connect_step1(struct connectdata *conn, int sockindex) {
   struct in6_addr addr6;
 #endif
 
-  infof(data, "schannel: Connecting to %s:%d (step 1/3)\n",
+  infof(data, "schannel: connecting to %s:%d (step 1/3)\n",
         conn->host.name, conn->remote_port);
 
   /* check for an existing re-usable credential handle */
@@ -231,7 +231,7 @@ schannel_connect_step2(struct connectdata *conn, int sockindex) {
   SecBufferDesc inbuf_desc;
   SECURITY_STATUS sspi_status = SEC_E_OK;
 
-  infof(data, "schannel: Connecting to %s:%d (step 2/3)\n",
+  infof(data, "schannel: connecting to %s:%d (step 2/3)\n",
         conn->host.name, conn->remote_port);
 
   /* buffer to store previously received and encrypted data */
@@ -393,6 +393,9 @@ schannel_connect_step3(struct connectdata *conn, int sockindex) {
   int incache;
 
   DEBUGASSERT(ssl_connect_3 == connssl->connecting_state);
+
+  infof(data, "schannel: connecting to %s:%d (step 3/3)\n",
+        conn->host.name, conn->remote_port);
 
   /* check if the required context attributes are met */
   if(connssl->ret_flags != connssl->req_flags) {
