@@ -26,9 +26,21 @@
 #ifdef USE_WINDOWS_SSPI
 #ifdef USE_SCHANNEL
 
+#include <schnlsp.h>
+
 #ifndef UNISP_NAME_A
 #define UNISP_NAME_A "Microsoft Unified Security Protocol Provider"
 #endif
+
+typedef struct curl_schannel_cred {
+  CredHandle cred_handle;
+  TimeStamp time_stamp;
+} curl_schannel_cred;
+
+typedef struct curl_schannel_ctxt {
+  CtxtHandle ctxt_handle;
+  TimeStamp time_stamp;
+} curl_schannel_ctxt;
 
 CURLcode Curl_schannel_connect(struct connectdata *conn, int sockindex);
 
