@@ -49,8 +49,6 @@
 #ifdef USE_WINDOWS_SSPI
 #ifdef USE_SCHANNEL
 
-#include <schnlsp.h>
-
 #include "urldata.h"
 #include "curl_sspi.h"
 #include "curl_schannel.h"
@@ -83,8 +81,7 @@ schannel_connect_step1(struct connectdata *conn, int sockindex) {
   SecBufferDesc outbuf_desc;
   SCHANNEL_CRED schannel_cred;
   SECURITY_STATUS sspi_status = SEC_E_OK;
-  CredHandle *old_cred_handle = NULL;
-  size_t old_cred_handle_size = 0;
+  curl_schannel_cred *old_cred = NULL;
   struct in_addr addr;
 #ifdef ENABLE_IPV6
   struct in6_addr addr6;
@@ -93,8 +90,9 @@ schannel_connect_step1(struct connectdata *conn, int sockindex) {
   infof(data, "schannel: Connecting to %s:%d (step 1/3)\n",
         conn->host.name, conn->remote_port);
 
-  if(!Curl_ssl_getsessionid(conn, &old_cred_handle, &old_cred_handle_size)) {
-    memcpy(&connssl->cred_handle, old_cred_handle, old_cred_handle_size);
+  /* check for an existing re-usable credential handle */
+  if(!Curl_ssl_getsessionid(conn, &old_cred, NULL)) {
+    connssl->cred = old_cred;
     infof(data, "schannel: re-using existing credential handle\n");
   }
   else {
@@ -137,10 +135,18 @@ schannel_connect_step1(struct connectdata *conn, int sockindex) {
         break;
     }
 
+    /* allocate memory for the re-usable credential handle */
+    connssl->cred = malloc(sizeof(curl_schannel_cred));
+    if (!connssl->cred) {
+      failf(data, "schannel: unable to allocate memory");
+      return CURLE_OUT_OF_MEMORY;
+    }
+    memset(connssl->cred, 0, sizeof(curl_schannel_cred));
+
     /* http://msdn.microsoft.com/en-us/library/windows/desktop/aa374716.aspx */
     sspi_status = s_pSecFn->AcquireCredentialsHandleA(NULL,
-      UNISP_NAME_A, SECPKG_CRED_OUTBOUND, NULL, &schannel_cred,
-      NULL, NULL, &connssl->cred_handle, &connssl->time_stamp);
+      UNISP_NAME_A, SECPKG_CRED_OUTBOUND, NULL, &schannel_cred, NULL, NULL,
+      &connssl->cred->cred_handle, &connssl->cred->time_stamp);
 
     if(sspi_status != SEC_E_OK) {
       if(sspi_status == SEC_E_WRONG_PRINCIPAL)
@@ -148,11 +154,11 @@ schannel_connect_step1(struct connectdata *conn, int sockindex) {
       else
         failf(data, "schannel: AcquireCredentialsHandleA failed: %d\n",
               sspi_status);
+      free(connssl->cred);
+      connssl->cred = NULL;
       return CURLE_SSL_CONNECT_ERROR;
     }
   }
-
-  connssl->schannel = TRUE;
 
   /* setup output buffer */
   outbuf.pvBuffer = NULL;
@@ -168,11 +174,19 @@ schannel_connect_step1(struct connectdata *conn, int sockindex) {
                        ISC_REQ_CONFIDENTIALITY | ISC_REQ_EXTENDED_ERROR |
                        ISC_REQ_ALLOCATE_MEMORY | ISC_REQ_STREAM;
 
+  /* allocate memory for the security context handle */
+  connssl->ctxt = malloc(sizeof(curl_schannel_ctxt));
+  if (!connssl->ctxt) {
+    failf(data, "schannel: unable to allocate memory");
+    return CURLE_OUT_OF_MEMORY;
+  }
+  memset(connssl->ctxt, 0, sizeof(curl_schannel_ctxt));
+
   /* http://msdn.microsoft.com/en-us/library/windows/desktop/aa375924.aspx */
-  sspi_status = s_pSecFn->InitializeSecurityContextA(&connssl->cred_handle,
-    NULL, conn->host.name, connssl->req_flags, 0, 0, NULL, 0,
-    &connssl->ctxt_handle, &outbuf_desc,
-    &connssl->ret_flags, &connssl->time_stamp);
+  sspi_status = s_pSecFn->InitializeSecurityContextA(
+    &connssl->cred->cred_handle, NULL, conn->host.name,
+    connssl->req_flags, 0, 0, NULL, 0, &connssl->ctxt->ctxt_handle,
+    &outbuf_desc, &connssl->ret_flags, &connssl->ctxt->time_stamp);
 
   if(sspi_status != SEC_I_CONTINUE_NEEDED) {
     if(sspi_status == SEC_E_WRONG_PRINCIPAL)
@@ -180,6 +194,8 @@ schannel_connect_step1(struct connectdata *conn, int sockindex) {
     else
       failf(data, "schannel: initial InitializeSecurityContextA failed: %d\n",
             sspi_status);
+    free(connssl->ctxt);
+    connssl->ctxt = NULL;
     return CURLE_SSL_CONNECT_ERROR;
   }
 
@@ -288,9 +304,9 @@ schannel_connect_step2(struct connectdata *conn, int sockindex) {
 
   /* http://msdn.microsoft.com/en-us/library/windows/desktop/aa375924.aspx */
   sspi_status = s_pSecFn->InitializeSecurityContextA(
-    &connssl->cred_handle, &connssl->ctxt_handle, conn->host.name,
-    connssl->req_flags, 0, 0, &inbuf_desc, 0, NULL, &outbuf_desc,
-    &connssl->ret_flags, &connssl->time_stamp);
+    &connssl->cred->cred_handle, &connssl->ctxt->ctxt_handle,
+    conn->host.name, connssl->req_flags, 0, 0, &inbuf_desc, 0, NULL,
+    &outbuf_desc, &connssl->ret_flags, &connssl->ctxt->time_stamp);
 
   /* free buffer for received handshake data */
   free(inbuf[0].pvBuffer);
@@ -374,9 +390,7 @@ schannel_connect_step3(struct connectdata *conn, int sockindex) {
   CURLcode retcode = CURLE_OK;
   struct SessionHandle *data = conn->data;
   struct ssl_connect_data *connssl = &conn->ssl[sockindex];
-  CredHandle *our_cred_handle = &conn->ssl[sockindex].cred_handle;
-  CredHandle *old_cred_handle = NULL;
-  CredHandle *new_cred_handle = NULL;
+  curl_schannel_cred *old_cred = NULL;
   int incache;
 
   DEBUGASSERT(ssl_connect_3 == connssl->connecting_state);
@@ -399,24 +413,17 @@ schannel_connect_step3(struct connectdata *conn, int sockindex) {
   }
 
   /* save the current session data for possible re-use */
-  incache = !(Curl_ssl_getsessionid(conn, &old_cred_handle, NULL));
+  incache = !(Curl_ssl_getsessionid(conn, &old_cred, NULL));
   if(incache) {
-    if(memcmp(old_cred_handle, our_cred_handle, sizeof(CredHandle))) {
+    if(old_cred != connssl->cred) {
       infof(data, "schannel: old credential handle is stale, removing\n");
-      Curl_ssl_delsessionid(conn, old_cred_handle);
+      Curl_ssl_delsessionid(conn, old_cred);
       incache = FALSE;
     }
   }
   if(!incache) {
-    new_cred_handle = malloc(sizeof(CredHandle));
-    if(new_cred_handle) {
-      memcpy(new_cred_handle, our_cred_handle, sizeof(CredHandle));
-      retcode = Curl_ssl_addsessionid(conn,
-                                      new_cred_handle, sizeof(CredHandle));
-    }
-    else {
-      retcode = CURLE_OUT_OF_MEMORY;
-    }
+    retcode = Curl_ssl_addsessionid(conn, connssl->cred,
+                                    sizeof(curl_schannel_cred));
     if(retcode) {
       failf(data, "schannel: failed to store credential handle\n");
       return retcode;
@@ -554,9 +561,9 @@ schannel_send(struct connectdata *conn, int sockindex,
 
   /* check if the maximum stream sizes were queried */
   if(connssl->stream_sizes.cbMaximumMessage == 0) {
-    sspi_status = s_pSecFn->QueryContextAttributesA(&connssl->ctxt_handle,
-                                                    SECPKG_ATTR_STREAM_SIZES,
-                                                    &connssl->stream_sizes);
+    sspi_status = s_pSecFn->QueryContextAttributesA(
+                              &connssl->ctxt->ctxt_handle,
+                              SECPKG_ATTR_STREAM_SIZES, &connssl->stream_sizes);
     if(sspi_status != SEC_E_OK) {
       *err = CURLE_SEND_ERROR;
       return -1;
@@ -603,7 +610,7 @@ schannel_send(struct connectdata *conn, int sockindex,
   memcpy(outbuf[1].pvBuffer, buf, len);
 
   /* http://msdn.microsoft.com/en-us/library/windows/desktop/aa375390.aspx */
-  sspi_status = s_pSecFn->EncryptMessage(&connssl->ctxt_handle, 0,
+  sspi_status = s_pSecFn->EncryptMessage(&connssl->ctxt->ctxt_handle, 0,
                                          &outbuf_desc, 0);
 
   /* check if the message was encrypted */
@@ -723,7 +730,7 @@ schannel_recv(struct connectdata *conn, int sockindex,
     inbuf_desc.ulVersion = SECBUFFER_VERSION;
 
     /* http://msdn.microsoft.com/en-us/library/windows/desktop/aa375348.aspx */
-    sspi_status = s_pSecFn->DecryptMessage(&connssl->ctxt_handle,
+    sspi_status = s_pSecFn->DecryptMessage(&connssl->ctxt->ctxt_handle,
                                            &inbuf_desc, 0, NULL);
     infof(data, "schannel: DecryptMessage %d\n", sspi_status);
 
@@ -847,7 +854,7 @@ Curl_schannel_connect(struct connectdata *conn, int sockindex) {
 bool Curl_schannel_data_pending(const struct connectdata *conn, int sockindex) {
   const struct ssl_connect_data *connssl = &conn->ssl[sockindex];
 
-  if(connssl->schannel) /* SSL is in use */
+  if(connssl->use) /* SSL is in use */
     return (connssl->encdata_offset > 0 ||
             connssl->decdata_offset > 0 ) ? TRUE : FALSE;
   else
@@ -861,9 +868,11 @@ void Curl_schannel_close(struct connectdata *conn, int sockindex) {
   infof(data, "schannel: Closing connection with %s:%d\n",
         conn->host.name, conn->remote_port);
 
-  /* free SSPI Schannel API context and handle */
-  if(connssl->schannel) {
-    s_pSecFn->DeleteSecurityContext(&connssl->ctxt_handle);
+  /* free SSPI Schannel API security context handle */
+  if(connssl->ctxt) {
+    s_pSecFn->DeleteSecurityContext(&connssl->ctxt->ctxt_handle);
+    free(connssl->ctxt);
+    connssl->ctxt = NULL;
   }
 
   /* free internal buffer for received encrypted data */
@@ -888,8 +897,12 @@ int Curl_schannel_shutdown(struct connectdata *conn, int sockindex) {
 }
 
 void Curl_schannel_session_free(void *ptr) {
-  s_pSecFn->FreeCredentialsHandle((CredHandle*) ptr);
-  free(ptr);
+  curl_schannel_cred *cred = ptr;
+
+  if(cred) {
+    s_pSecFn->FreeCredentialsHandle(&cred->cred_handle);
+    free(cred);
+  }
 }
 
 int Curl_schannel_init() {
