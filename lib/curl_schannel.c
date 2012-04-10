@@ -740,6 +740,13 @@ schannel_recv(struct connectdata *conn, int sockindex,
                                            &inbuf_desc, 0, NULL);
     infof(data, "schannel: DecryptMessage %d\n", sspi_status);
 
+    /* check if we need more data */
+    if(sspi_status == SEC_E_INCOMPLETE_MESSAGE) {
+      infof(data, "schannel: failed to decrypt data, need more data\n");
+      *err = CURLE_AGAIN;
+      return -1;
+    }
+
     /* check if everything went fine (server may want to renegotiate context) */
     if(sspi_status == SEC_E_OK || sspi_status == SEC_I_RENEGOTIATE ||
                                   sspi_status == SEC_I_CONTEXT_EXPIRED) {
@@ -836,11 +843,9 @@ schannel_recv(struct connectdata *conn, int sockindex,
   }
 
   /* check if something went wrong and we need to return an error */
-  if(ret < 0) {
-    if(sspi_status == SEC_E_INCOMPLETE_MESSAGE)
-      *err = CURLE_AGAIN;
-    else if(sspi_status != SEC_E_OK)
-      *err = CURLE_RECV_ERROR;
+  if(ret < 0 && sspi_status != SEC_E_OK) {
+    infof(data, "schannel: failed to read data from server\n");
+    *err = CURLE_RECV_ERROR;
     return -1;
   }
 
