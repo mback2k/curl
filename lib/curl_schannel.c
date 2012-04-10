@@ -741,7 +741,8 @@ schannel_recv(struct connectdata *conn, int sockindex,
     infof(data, "schannel: DecryptMessage %d\n", sspi_status);
 
     /* check if everything went fine (server may want to renegotiate context) */
-    if(sspi_status == SEC_E_OK || sspi_status == SEC_I_RENEGOTIATE) {
+    if(sspi_status == SEC_E_OK || sspi_status == SEC_I_RENEGOTIATE ||
+                                  sspi_status == SEC_I_CONTEXT_EXPIRED) {
       /* check for successfully decrypted data */
       if(inbuf[1].BufferType == SECBUFFER_DATA) {
         infof(data, "schannel: decrypted data length: %d\n", inbuf[1].cbBuffer);
