@@ -38,7 +38,6 @@
 
 /*
  * TODO list for TLS/SSL implementation:
- * - implement session handling and re-use
  * - implement write buffering
  * - implement SSL/TLS shutdown
  * - special cases: renegotiation, certificates, algorithms
