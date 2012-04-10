@@ -40,7 +40,9 @@
  * TODO list for TLS/SSL implementation:
  * - implement write buffering
  * - implement SSL/TLS shutdown
- * - special cases: renegotiation, certificates, algorithms
+ * - implement client certificates
+ * - implement server certificates
+ * - implement algorithm option
  */
 
 #include "setup.h"
@@ -232,8 +234,6 @@ schannel_connect_step2(struct connectdata *conn, int sockindex) {
   infof(data, "schannel: Connecting to %s:%d (step 2/3)\n",
         conn->host.name, conn->remote_port);
 
-  connssl->connecting_state = ssl_connect_2;
-
   /* buffer to store previously received and encrypted data */
   if(connssl->encdata_buffer == NULL) {
     connssl->encdata_offset = 0;
@@ -249,13 +249,13 @@ schannel_connect_step2(struct connectdata *conn, int sockindex) {
   read = sread(conn->sock[sockindex],
                connssl->encdata_buffer + connssl->encdata_offset,
                connssl->encdata_length - connssl->encdata_offset);
-  if(read < 0) {
+  if(read < 0 && connssl->connecting_state != ssl_connect_2_writing) {
     connssl->connecting_state = ssl_connect_2_reading;
     infof(data, "schannel: failed to receive handshake, waiting for more: %d\n",
           read);
     return CURLE_OK;
   }
-  else if(read == 0) {
+  else if(read == 0 && connssl->connecting_state != ssl_connect_2_writing) {
     failf(data, "schannel: failed to receive handshake, connection failed\n");
     return CURLE_SSL_CONNECT_ERROR;
   }
@@ -697,15 +697,19 @@ schannel_recv(struct connectdata *conn, int sockindex,
       /* increase encrypted data buffer offset */
       connssl->encdata_offset += read;
     }
+    else if(connssl->encdata_offset == 0) {
+      if(read == 0)
+        ret = 0;
+      else
+        *err = CURLE_AGAIN;
+    }
   }
 
   infof(data, "schannel: encrypted data buffer %d/%d\n",
     connssl->encdata_offset, connssl->encdata_length);
 
   /* check if we still have some data in our buffers */
-  while(connssl->encdata_offset > 0 &&
-        sspi_status != SEC_E_INCOMPLETE_MESSAGE) {
-
+  while(connssl->encdata_offset > 0 && sspi_status == SEC_E_OK) {
     /* prepare data buffer for DecryptMessage call */
     inbuf[0].pvBuffer = connssl->encdata_buffer;
     inbuf[0].cbBuffer = connssl->encdata_offset;
@@ -783,9 +787,12 @@ schannel_recv(struct connectdata *conn, int sockindex,
 
       /* begin renegotiation */
       connssl->state = ssl_connection_negotiating;
+      connssl->connecting_state = ssl_connect_2_writing;
       retcode = schannel_connect_common(conn, sockindex, FALSE, &done);
       if(retcode)
         *err = retcode;
+      else /* now retry receiving data */
+        return schannel_recv(conn, sockindex, buf, len, err);
     }
   }
 
@@ -813,6 +820,13 @@ schannel_recv(struct connectdata *conn, int sockindex,
                               connssl->decdata_offset + 2048 : 4096;
     connssl->decdata_buffer = realloc(connssl->decdata_buffer,
                                       connssl->decdata_length);
+  }
+
+  /* check if the server closed the connection */
+  if(ret <= 0 && sspi_status == SEC_I_CONTEXT_EXPIRED) {
+    infof(data, "schannel: server closed the connection\n");
+    *err = CURLE_OK;
+    return 0;
   }
 
   /* check if something went wrong and we need to return an error */
