@@ -401,7 +401,7 @@ schannel_connect_step3(struct connectdata *conn, int sockindex) {
   /* save the current session data for possible re-use */
   incache = !(Curl_ssl_getsessionid(conn, &old_cred_handle, NULL));
   if(incache) {
-    if(old_cred_handle != our_cred_handle) {
+    if(memcmp(old_cred_handle, our_cred_handle, sizeof(CredHandle))) {
       infof(data, "schannel: old credential handle is stale, removing\n");
       Curl_ssl_delsessionid(conn, old_cred_handle);
       incache = FALSE;
@@ -420,6 +420,9 @@ schannel_connect_step3(struct connectdata *conn, int sockindex) {
     if(retcode) {
       failf(data, "schannel: failed to store credential handle\n");
       return retcode;
+    }
+    else {
+      infof(data, "schannel: stored crendential handle\n");
     }
   }
 
@@ -861,7 +864,6 @@ void Curl_schannel_close(struct connectdata *conn, int sockindex) {
   /* free SSPI Schannel API context and handle */
   if(connssl->schannel) {
     s_pSecFn->DeleteSecurityContext(&connssl->ctxt_handle);
-    s_pSecFn->FreeCredentialsHandle(&connssl->cred_handle);
   }
 
   /* free internal buffer for received encrypted data */
@@ -883,6 +885,11 @@ void Curl_schannel_close(struct connectdata *conn, int sockindex) {
 
 int Curl_schannel_shutdown(struct connectdata *conn, int sockindex) {
   return CURLE_NOT_BUILT_IN; /* TODO: implement SSL/TLS shutdown */
+}
+
+void Curl_schannel_session_free(void *ptr) {
+  s_pSecFn->FreeCredentialsHandle((CredHandle*) ptr);
+  free(ptr);
 }
 
 int Curl_schannel_init() {
