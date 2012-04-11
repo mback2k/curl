@@ -40,9 +40,15 @@
  * TODO list for TLS/SSL implementation:
  * - implement write buffering
  * - implement SSL/TLS shutdown
- * - implement client certificates
- * - implement server certificates
- * - implement algorithm option
+ * - implement client certificate authentication
+ * - implement custom server certificate validation
+ * - implement cipher/algorithm option
+ *
+ * Related articles on MSDN:
+ * - Getting a Certificate for Schannel
+ *   http://msdn.microsoft.com/en-us/library/windows/desktop/aa380161.aspx
+ * - Specifying Schannel Ciphers and Cipher Strengths
+ *   http://msdn.microsoft.com/en-us/library/windows/desktop/aa380161.aspx
  */
 
 #include "setup.h"
