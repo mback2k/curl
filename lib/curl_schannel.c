@@ -729,7 +729,6 @@ schannel_recv(struct connectdata *conn, int sockindex,
     /* http://msdn.microsoft.com/en-us/library/windows/desktop/aa375348.aspx */
     sspi_status = s_pSecFn->DecryptMessage(&connssl->ctxt->ctxt_handle,
                                            &inbuf_desc, 0, NULL);
-    infof(data, "schannel: DecryptMessage %d\n", sspi_status);
 
     /* check if we need more data */
     if(sspi_status == SEC_E_INCOMPLETE_MESSAGE) {
@@ -853,9 +852,6 @@ schannel_recv(struct connectdata *conn, int sockindex,
     *err = CURLE_RECV_ERROR;
     return -1;
   }
-
-  /* everything went fine */
-  infof(data, "schannel: read returns %d with error code %d\n", ret, *err);
 
   return ret;
 }
