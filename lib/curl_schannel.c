@@ -836,14 +836,14 @@ schannel_recv(struct connectdata *conn, int sockindex,
 
   /* reduce internal buffer length to reduce memory usage */
   if(connssl->encdata_length > 4096) {
-    connssl->encdata_length = connssl->encdata_offset > 0 ?
-                              connssl->encdata_offset + 2048 : 4096;
+    connssl->encdata_length = connssl->encdata_offset > 4096 ?
+                              connssl->encdata_offset : 4096;
     connssl->encdata_buffer = realloc(connssl->encdata_buffer,
                                       connssl->encdata_length);
   }
   if(connssl->decdata_length > 4096) {
-    connssl->decdata_length = connssl->decdata_offset > 0 ?
-                              connssl->decdata_offset + 2048 : 4096;
+    connssl->decdata_length = connssl->decdata_offset > 4096 ?
+                              connssl->decdata_offset : 4096;
     connssl->decdata_buffer = realloc(connssl->decdata_buffer,
                                       connssl->decdata_length);
   }
