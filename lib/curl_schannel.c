@@ -249,19 +249,20 @@ schannel_connect_step2(struct connectdata *conn, int sockindex) {
   read = sread(conn->sock[sockindex],
                connssl->encdata_buffer + connssl->encdata_offset,
                connssl->encdata_length - connssl->encdata_offset);
-  if(read < 0 && connssl->connecting_state != ssl_connect_2_writing) {
-    connssl->connecting_state = ssl_connect_2_reading;
-    infof(data, "schannel: failed to receive handshake, waiting for more: %d\n",
-          read);
-    return CURLE_OK;
-  }
-  else if(read == 0 && connssl->connecting_state != ssl_connect_2_writing) {
-    failf(data, "schannel: failed to receive handshake, connection failed\n");
-    return CURLE_SSL_CONNECT_ERROR;
-  }
-  else if(read > 0) {
+  if(read > 0) {
     /* increase encrypted data buffer offset */
     connssl->encdata_offset += read;
+  }
+  else if(connssl->connecting_state != ssl_connect_2_writing) {
+    if(read < 0) {
+      connssl->connecting_state = ssl_connect_2_reading;
+      infof(data, "schannel: failed to receive handshake, need more data\n");
+      return CURLE_OK;
+    }
+    else if(read == 0) {
+      failf(data, "schannel: failed to receive handshake, connection failed\n");
+      return CURLE_SSL_CONNECT_ERROR;
+    }
   }
 
   infof(data, "schannel: encrypted data buffer %d/%d\n",
