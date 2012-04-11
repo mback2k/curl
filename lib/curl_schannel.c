@@ -70,45 +70,6 @@
  * #define failf(x, y, ...) printf(y, __VA_ARGS__)
  */
 
-/* helper function which always returns a usable status message string */
-#ifdef WIN32
-static char* sspi_status_msg(SECURITY_STATUS status) {
-  LPSTR format_msg = NULL;
-  char *status_msg = NULL;
-  int status_len = 0;
-
-  status_len = FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER |
-                             FORMAT_MESSAGE_FROM_SYSTEM |
-                             FORMAT_MESSAGE_IGNORE_INSERTS,
-                             NULL, status, 0, (LPTSTR)&format_msg, 0, NULL);
-  if(status_len > 0 && format_msg) {
-    status_msg = strdup(format_msg);
-    LocalFree(format_msg);
-
-    /* remove trailing CR+LF */
-    if(status_len > 0) {
-      if(status_msg[status_len-1] == '\n') {
-        status_msg[status_len-1] = '\0';
-        if(status_len > 1) {
-          if(status_msg[status_len-2] == '\r') {
-            status_msg[status_len-2] = '\0';
-          }
-        }
-      }
-    }
-  }
-  else {
-    status_msg = curl_maprintf("%08X", status);
-  }
-
-  return status_msg;
-}
-#else
-static char* sspi_status_msg(SECURITY_STATUS status) {
-  return curl_maprintf("%08X", status);
-}
-#endif
-
 static Curl_recv schannel_recv;
 static Curl_send schannel_send;
 
@@ -190,7 +151,7 @@ schannel_connect_step1(struct connectdata *conn, int sockindex) {
       &connssl->cred->cred_handle, &connssl->cred->time_stamp);
 
     if(sspi_status != SEC_E_OK) {
-      sspi_msg = sspi_status_msg(sspi_status);
+      sspi_msg = Curl_sspi_status_msg(sspi_status);
       if(sspi_status == SEC_E_WRONG_PRINCIPAL)
         failf(data, "schannel: SNI or certificate check failed: %s\n",
               sspi_msg);
@@ -233,7 +194,7 @@ schannel_connect_step1(struct connectdata *conn, int sockindex) {
     &outbuf_desc, &connssl->ret_flags, &connssl->ctxt->time_stamp);
 
   if(sspi_status != SEC_I_CONTINUE_NEEDED) {
-    sspi_msg = sspi_status_msg(sspi_status);
+    sspi_msg = Curl_sspi_status_msg(sspi_status);
     if(sspi_status == SEC_E_WRONG_PRINCIPAL)
       failf(data, "schannel: SNI or certificate check failed: %s\n",
             sspi_msg);
@@ -390,7 +351,7 @@ schannel_connect_step2(struct connectdata *conn, int sockindex) {
     }
   }
   else {
-    sspi_msg = sspi_status_msg(sspi_status);
+    sspi_msg = Curl_sspi_status_msg(sspi_status);
     if(sspi_status == SEC_E_WRONG_PRINCIPAL)
       failf(data, "schannel: SNI or certificate check failed: %s\n",
             sspi_msg);
@@ -898,7 +859,7 @@ schannel_recv(struct connectdata *conn, int sockindex,
 
   /* check if something went wrong and we need to return an error */
   if(ret < 0 && sspi_status != SEC_E_OK) {
-    sspi_msg = sspi_status_msg(sspi_status);
+    sspi_msg = Curl_sspi_status_msg(sspi_status);
     infof(data, "schannel: failed to read data from server: %s\n", sspi_msg);
     free(sspi_msg);
     *err = CURLE_RECV_ERROR;
