@@ -132,8 +132,8 @@
 #endif /* USE_AXTLS */
 
 #ifdef USE_SCHANNEL
+#include "curl_sspi.h"
 #include <schnlsp.h>
-#include <sspi.h>
 #include <schannel.h>
 #endif
 
