@@ -124,6 +124,11 @@ endif
 ifeq ($(findstring -ipv6,$(CFG)),-ipv6)
 IPV6 = 1
 endif
+ifeq ($(findstring -schannel,$(CFG)),-schannel)
+SCHANNEL = 1
+SSPI = 1
+SSL = 1
+endif
 
 INCLUDES = -I. -I../include
 CFLAGS += -DBUILDING_LIBCURL
@@ -145,11 +150,15 @@ ifdef SSH2
   DLL_LIBS += -L"$(LIBSSH2_PATH)/win32" -lssh2
 endif
 ifdef SSL
+  CFLAGS += -DCURL_WANTS_CA_BUNDLE_ENV
+ifdef SCHANNEL
+  CFLAGS += -DUSE_SSL -DUSE_SCHANNEL
+else
   INCLUDES += -I"$(OPENSSL_INCLUDE)"
   CFLAGS += -DUSE_SSLEAY -DUSE_OPENSSL -DHAVE_OPENSSL_ENGINE_H -DHAVE_OPENSSL_PKCS12_H \
-            -DHAVE_ENGINE_LOAD_BUILTIN_ENGINES -DOPENSSL_NO_KRB5 \
-            -DCURL_WANTS_CA_BUNDLE_ENV
+            -DHAVE_ENGINE_LOAD_BUILTIN_ENGINES -DOPENSSL_NO_KRB5
   DLL_LIBS += -L"$(OPENSSL_LIBPATH)" $(OPENSSL_LIBS)
+endif
 endif
 ifdef ZLIB
   INCLUDES += -I"$(ZLIB_PATH)"
