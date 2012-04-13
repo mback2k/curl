@@ -9,10 +9,13 @@ Curl and libcurl 7.25.1
 
 This release includes the following changes:
 
+ o nss: the minimal supported version of NSS bumped to 3.12.x
+ o nss: human-readable names are now provided for NSS errors if available
  o 
 
 This release includes the following bugfixes:
 
+ o nss: libcurl now uses NSS_InitContext() to prevent collisions if available [1]
  o 
 
 This release includes the following known bugs:
@@ -28,4 +31,5 @@ advice from friends like these:
 
 References to bug reports and discussions on issues:
 
+ [1] = https://bugzilla.redhat.com/738456
  
