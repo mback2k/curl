@@ -152,7 +152,7 @@ schannel_connect_step1(struct connectdata *conn, int sockindex) {
 
     /* http://msdn.microsoft.com/en-us/library/windows/desktop/aa374716.aspx */
     sspi_status = s_pSecFn->AcquireCredentialsHandle(NULL,
-      UNISP_NAME_A, SECPKG_CRED_OUTBOUND, NULL, &schannel_cred, NULL, NULL,
+      UNISP_NAME, SECPKG_CRED_OUTBOUND, NULL, &schannel_cred, NULL, NULL,
       &connssl->cred->cred_handle, &connssl->cred->time_stamp);
 
     if(sspi_status != SEC_E_OK) {
