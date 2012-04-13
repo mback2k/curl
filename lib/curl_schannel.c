@@ -46,7 +46,7 @@
  *
  * Related articles on MSDN:
  * - Getting a Certificate for Schannel
- *   http://msdn.microsoft.com/en-us/library/windows/desktop/aa380161.aspx
+ *   http://msdn.microsoft.com/en-us/library/windows/desktop/aa375447.aspx
  * - Specifying Schannel Ciphers and Cipher Strengths
  *   http://msdn.microsoft.com/en-us/library/windows/desktop/aa380161.aspx
  */
