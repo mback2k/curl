@@ -653,7 +653,6 @@ schannel_send(struct connectdata *conn, int sockindex,
 static ssize_t
 schannel_recv(struct connectdata *conn, int sockindex,
               char *buf, size_t len, CURLcode *err) {
-  int i = 0;
   size_t size = 0;
   ssize_t read = 0, ret = -1;
   CURLcode retcode;
