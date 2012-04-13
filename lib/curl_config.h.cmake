@@ -1,4 +1,4 @@
-/* lib/curl_config.h.in.  Generated from configure.ac by autoheader.  */
+/* lib/curl_config.h.in.  Generated somehow by cmake.  */
 
 /* when building libcurl itself */
 #cmakedefine BUILDING_LIBCURL ${BUILDING_LIBCURL}
@@ -51,9 +51,6 @@
 #ifndef CURL_EXTERN_SYMBOL
 #define CURL_EXTERN_SYMBOL
 #endif
-
-/* to enable hidden symbols */
-#cmakedefine CURL_HIDDEN_SYMBOLS ${CURL_HIDDEN_SYMBOLS}
 
 /* Use Windows LDAP implementation */
 #cmakedefine CURL_LDAP_WIN ${CURL_LDAP_WIN}
@@ -723,9 +720,6 @@
 /* Define to the sub-directory in which libtool stores uninstalled libraries.
    */
 #cmakedefine LT_OBJDIR ${LT_OBJDIR}
-
-/* Define to 1 if you are building a native Windows target. */
-#cmakedefine NATIVE_WINDOWS ${NATIVE_WINDOWS}
 
 /* If you lack a fine basename() prototype */
 #cmakedefine NEED_BASENAME_PROTO ${NEED_BASENAME_PROTO}

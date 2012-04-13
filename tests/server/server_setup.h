@@ -1,5 +1,5 @@
-#ifndef HEADER_CURL_LIBTEST_TESTUTIL_H
-#define HEADER_CURL_LIBTEST_TESTUTIL_H
+#ifndef HEADER_CURL_SERVER_SETUP_H
+#define HEADER_CURL_SERVER_SETUP_H
 /***************************************************************************
  *                                  _   _ ____  _
  *  Project                     ___| | | |  _ \| |
@@ -21,27 +21,9 @@
  * KIND, either express or implied.
  *
  ***************************************************************************/
-#include "setup.h"
 
-struct timeval tutil_tvnow(void);
+#define CURL_NO_OLDIES
 
-/*
- * Make sure that the first argument (t1) is the more recent time and t2 is
- * the older time, as otherwise you get a weird negative time-diff back...
- *
- * Returns: the time difference in number of milliseconds.
- */
-long tutil_tvdiff(struct timeval t1, struct timeval t2);
+#include "setup.h" /* portability help from the lib directory */
 
-/*
- * Same as tutil_tvdiff but with full usec resolution.
- *
- * Returns: the time difference in seconds with subsecond resolution.
- */
-double tutil_tvdiff_secs(struct timeval t1, struct timeval t2);
-
-long tutil_tvlong(struct timeval t1);
-
-
-#endif  /* HEADER_CURL_LIBTEST_TESTUTIL_H */
-
+#endif /* HEADER_CURL_SERVER_SETUP_H */

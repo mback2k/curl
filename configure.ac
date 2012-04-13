@@ -44,6 +44,7 @@ CURL_CHECK_OPTION_OPTIMIZE
 CURL_CHECK_OPTION_WARNINGS
 CURL_CHECK_OPTION_WERROR
 CURL_CHECK_OPTION_CURLDEBUG
+CURL_CHECK_OPTION_SYMBOL_HIDING
 CURL_CHECK_OPTION_ARES
 
 CURL_CHECK_PATH_SEPARATOR_REQUIRED
@@ -236,21 +237,18 @@ esac
 AC_MSG_RESULT($mimpure)
 AM_CONDITIONAL(MIMPURE, test x$mimpure = xyes)
 
-dnl 'STATICLIB' is, in spite of its name, not generic but only for static-only
-dnl builds on Windows
-AM_CONDITIONAL(STATICLIB, false)
-
 AC_MSG_CHECKING([if we need BUILDING_LIBCURL])
+use_cppflag_building_libcurl="no"
+use_cppflag_curl_staticlib="no"
 case $host in
   *-*-mingw*)
-    AC_DEFINE(BUILDING_LIBCURL, 1, [when building libcurl itself])
     AC_MSG_RESULT(yes)
+    use_cppflag_building_libcurl="yes"
     AC_MSG_CHECKING([if we need CURL_STATICLIB])
     if test "X$enable_shared" = "Xno"
     then
-      AC_DEFINE(CURL_STATICLIB, 1, [when not building a shared library])
       AC_MSG_RESULT(yes)
-      AM_CONDITIONAL(STATICLIB, true)
+      use_cppflag_curl_staticlib="yes"
     else
       AC_MSG_RESULT(no)
     fi
@@ -259,6 +257,8 @@ case $host in
     AC_MSG_RESULT(no)
     ;;
 esac
+AM_CONDITIONAL(USE_CPPFLAG_BUILDING_LIBCURL, test x$use_cppflag_building_libcurl = xyes)
+AM_CONDITIONAL(USE_CPPFLAG_CURL_STATICLIB, test x$use_cppflag_curl_staticlib = xyes)
 
 # Determine whether all dependent libraries must be specified when linking
 if test "X$enable_shared" = "Xyes" -a "X$link_all_deplibs" = "Xno"
@@ -300,6 +300,7 @@ fi
 
 CURL_CHECK_COMPILER_HALT_ON_ERROR
 CURL_CHECK_COMPILER_ARRAY_SIZE_NEGATIVE
+CURL_CHECK_COMPILER_SYMBOL_HIDING
 
 CURL_CHECK_NO_UNDEFINED
 AM_CONDITIONAL(NO_UNDEFINED, test x$need_no_undefined = xyes)
@@ -3061,48 +3062,9 @@ AC_HELP_STRING([--disable-cookies],[Disable cookies support]),
 )
 
 dnl ************************************************************
-dnl Enable hiding of internal symbols in library to reduce its size and
-dnl speed dynamic linking of applications.  This currently is only supported
-dnl on gcc >= 4.0 and SunPro C.
+dnl hiding of library internal symbols
 dnl
-AC_MSG_CHECKING([whether to enable hidden symbols in the library])
-AC_ARG_ENABLE(hidden-symbols,
-AC_HELP_STRING([--enable-hidden-symbols],[Hide internal symbols in library])
-AC_HELP_STRING([--disable-hidden-symbols],[Leave all symbols with default visibility in library]),
-[ case "$enableval" in
-  no)
-       AC_MSG_RESULT(no)
-       ;;
-  *)
-       AC_MSG_CHECKING([whether $CC supports it])
-       if test "$GCC" = yes ; then
-         if $CC --help --verbose 2>&1 | grep fvisibility= > /dev/null ||
-           dnl clang always supports -fvisibility= but it doesn't show up
-           dnl under --help.
-           test "$compiler_id" = "CLANG"; then
-           AC_MSG_RESULT(yes)
-           AC_DEFINE(CURL_HIDDEN_SYMBOLS, 1, [to enable hidden symbols])
-           AC_DEFINE(CURL_EXTERN_SYMBOL, [__attribute__ ((visibility ("default")))], [to make a symbol visible])
-           CFLAGS="$CFLAGS -fvisibility=hidden"
-         else
-            AC_MSG_RESULT(no)
-          fi
-
-       else
-         dnl Test for SunPro cc
-         if $CC 2>&1 | grep flags >/dev/null && $CC -flags | grep xldscope= >/dev/null ; then
-           AC_MSG_RESULT(yes)
-           AC_DEFINE(CURL_HIDDEN_SYMBOLS, 1, [to enable hidden symbols])
-           AC_DEFINE(CURL_EXTERN_SYMBOL, [__global], [to make a symbol visible])
-           CFLAGS="$CFLAGS -xldscope=hidden"
-         else
-           AC_MSG_RESULT(no)
-         fi
-       fi
-       ;;
-  esac ],
-       AC_MSG_RESULT(no)
-)
+CURL_CONFIGURE_SYMBOL_HIDING
 
 dnl ************************************************************
 dnl enforce SONAME bump

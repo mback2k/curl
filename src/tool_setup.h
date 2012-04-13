@@ -24,7 +24,26 @@
 
 #define CURL_NO_OLDIES
 
+/*
+ * setup.h may define preprocessor macros such as _FILE_OFFSET_BITS and
+ * _LARGE_FILES in order to support files larger than 2 GB. On platforms
+ * where this happens it is mandatory that these macros are defined before
+ * any system header file is included, otherwise file handling function
+ * prototypes will be misdeclared and curl tool may not build properly;
+ * therefore we must include setup.h before curl.h when building curl.
+ */
+
 #include "setup.h" /* from the lib directory */
+
+/*
+ * curl tool certainly uses libcurl's external interface.
+ */
+
+#include <curl/curl.h> /* external interface */
+
+/*
+ * Platform specific stuff.
+ */
 
 #if defined(macintosh) && defined(__MRC__)
 #  define main(x,y) curl_main(x,y)
