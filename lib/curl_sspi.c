@@ -266,7 +266,8 @@ Curl_sspi_status(SECURITY_STATUS status)
       status_const = "Unknown error";
   }
 
-  return curl_maprintf("%s (0x%08X)", status_const, status);
+  return curl_maprintf("%s (0x%04X%04X)", status_const,
+                       (status>>16)&0xffff, status&0xffff);
 }
 
 
