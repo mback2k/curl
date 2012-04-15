@@ -958,7 +958,7 @@ void Curl_schannel_cleanup() {
 size_t Curl_schannel_version(char *buffer, size_t size)
 {
   char* version = Curl_sspi_version();
-  size = snprintf(buffer, size, "Schannel-%s", version);
+  size = snprintf(buffer, size, "Schannel/%s", version);
   free(version);
   return size;
 }
