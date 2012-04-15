@@ -145,7 +145,7 @@ Curl_sspi_version()
           if(data) {
             if(GetFileVersionInfo(path, handle, size, data)) {
               if(VerQueryValue(data, "\\", (LPVOID*)&version_info, &length)) {
-                version = curl_maprintf("SSPI/%d.%d.%d.%d",
+                version = curl_maprintf("%d.%d.%d.%d",
                   (version_info->dwProductVersionMS>>16)&0xffff,
                   (version_info->dwProductVersionMS>>0)&0xffff,
                   (version_info->dwProductVersionLS>>16)&0xffff,
@@ -159,7 +159,7 @@ Curl_sspi_version()
       free(path);
     }
     if(!version)
-      version = curl_maprintf("SSPI/%d", s_pSecFn ? s_pSecFn->dwVersion : 0);
+      version = curl_maprintf("%d", s_pSecFn ? s_pSecFn->dwVersion : 0);
   }
 
   if(!version)
