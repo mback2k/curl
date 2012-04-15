@@ -133,6 +133,7 @@ Curl_sspi_version()
   LPTSTR path = NULL;
   LPVOID data = NULL;
   DWORD size, handle;
+  UINT length;
 
   if(s_hSecDll) {
     path = malloc(MAX_PATH);
@@ -143,7 +144,7 @@ Curl_sspi_version()
           data = malloc(size);
           if(data) {
             if(GetFileVersionInfo(path, handle, size, data)) {
-              if(VerQueryValue(data, "\\", &version_info, &handle)) {
+              if(VerQueryValue(data, "\\", (LPVOID*)&version_info, &length)) {
                 version = curl_maprintf("SSPI/%d.%d.%d.%d",
                   (version_info->dwProductVersionMS>>16)&0xffff,
                   (version_info->dwProductVersionMS>>0)&0xffff,
