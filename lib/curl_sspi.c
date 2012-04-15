@@ -159,7 +159,7 @@ Curl_sspi_version()
       free(path);
     }
     if(!version)
-      version = strdup("SSPI/Unknown");
+      version = curl_maprintf("SSPI/%d", s_pSecFn ? s_pSecFn->dwVersion : 0);
   }
 
   if(!version)
