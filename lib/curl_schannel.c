@@ -83,7 +83,7 @@ schannel_connect_step1(struct connectdata *conn, int sockindex)
 {
   ssize_t write = -1;
   struct SessionHandle *data = conn->data;
-  struct ssl_connect_data* connssl = &conn->ssl[sockindex];
+  struct ssl_connect_data *connssl = &conn->ssl[sockindex];
   SecBuffer outbuf;
   SecBufferDesc outbuf_desc;
   SCHANNEL_CRED schannel_cred;
@@ -238,7 +238,7 @@ schannel_connect_step2(struct connectdata *conn, int sockindex)
   int i;
   ssize_t read = -1, write = -1;
   struct SessionHandle *data = conn->data;
-  struct ssl_connect_data* connssl = &conn->ssl[sockindex];
+  struct ssl_connect_data *connssl = &conn->ssl[sockindex];
   SecBuffer outbuf[2];
   SecBufferDesc outbuf_desc;
   SecBuffer inbuf[2];
@@ -974,7 +974,7 @@ void Curl_schannel_cleanup()
 
 size_t Curl_schannel_version(char *buffer, size_t size)
 {
-  char* version = Curl_sspi_version();
+  char *version = Curl_sspi_version();
   size = snprintf(buffer, size, "Schannel/%s", version);
   free(version);
   return size;
