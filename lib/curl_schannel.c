@@ -79,7 +79,8 @@ static Curl_recv schannel_recv;
 static Curl_send schannel_send;
 
 static CURLcode
-schannel_connect_step1(struct connectdata *conn, int sockindex) {
+schannel_connect_step1(struct connectdata *conn, int sockindex)
+{
   ssize_t write = -1;
   struct SessionHandle *data = conn->data;
   struct ssl_connect_data* connssl = &conn->ssl[sockindex];
@@ -232,7 +233,8 @@ schannel_connect_step1(struct connectdata *conn, int sockindex) {
 }
 
 static CURLcode
-schannel_connect_step2(struct connectdata *conn, int sockindex) {
+schannel_connect_step2(struct connectdata *conn, int sockindex)
+{
   int i;
   ssize_t read = -1, write = -1;
   struct SessionHandle *data = conn->data;
@@ -401,7 +403,8 @@ schannel_connect_step2(struct connectdata *conn, int sockindex) {
 }
 
 static CURLcode
-schannel_connect_step3(struct connectdata *conn, int sockindex) {
+schannel_connect_step3(struct connectdata *conn, int sockindex)
+{
   CURLcode retcode = CURLE_OK;
   struct SessionHandle *data = conn->data;
   struct ssl_connect_data *connssl = &conn->ssl[sockindex];
@@ -458,7 +461,8 @@ schannel_connect_step3(struct connectdata *conn, int sockindex) {
 
 static CURLcode
 schannel_connect_common(struct connectdata *conn, int sockindex,
-                        bool nonblocking, bool *done) {
+                        bool nonblocking, bool *done)
+{
   CURLcode retcode;
   struct SessionHandle *data = conn->data;
   struct ssl_connect_data *connssl = &conn->ssl[sockindex];
@@ -568,7 +572,8 @@ schannel_connect_common(struct connectdata *conn, int sockindex,
 
 static ssize_t
 schannel_send(struct connectdata *conn, int sockindex,
-              const void *buf, size_t len, CURLcode *err) {
+              const void *buf, size_t len, CURLcode *err)
+{
   ssize_t ret = -1;
   size_t data_len = 0;
   unsigned char *data = NULL;
@@ -652,7 +657,8 @@ schannel_send(struct connectdata *conn, int sockindex,
 
 static ssize_t
 schannel_recv(struct connectdata *conn, int sockindex,
-              char *buf, size_t len, CURLcode *err) {
+              char *buf, size_t len, CURLcode *err)
+{
   size_t size = 0;
   ssize_t read = 0, ret = -1;
   CURLcode retcode;
@@ -878,12 +884,14 @@ schannel_recv(struct connectdata *conn, int sockindex,
 
 CURLcode
 Curl_schannel_connect_nonblocking(struct connectdata *conn, int sockindex,
-                                  bool *done) {
+                                  bool *done)
+{
   return schannel_connect_common(conn, sockindex, TRUE, done);
 }
 
 CURLcode
-Curl_schannel_connect(struct connectdata *conn, int sockindex) {
+Curl_schannel_connect(struct connectdata *conn, int sockindex)
+{
   CURLcode retcode;
   bool done = FALSE;
 
@@ -896,7 +904,8 @@ Curl_schannel_connect(struct connectdata *conn, int sockindex) {
   return CURLE_OK;
 }
 
-bool Curl_schannel_data_pending(const struct connectdata *conn, int sockindex) {
+bool Curl_schannel_data_pending(const struct connectdata *conn, int sockindex)
+{
   const struct ssl_connect_data *connssl = &conn->ssl[sockindex];
 
   if(connssl->use) /* SSL is in use */
@@ -906,7 +915,8 @@ bool Curl_schannel_data_pending(const struct connectdata *conn, int sockindex) {
     return FALSE;
 }
 
-void Curl_schannel_close(struct connectdata *conn, int sockindex) {
+void Curl_schannel_close(struct connectdata *conn, int sockindex)
+{
   struct SessionHandle *data = conn->data;
   struct ssl_connect_data *connssl = &conn->ssl[sockindex];
 
@@ -937,11 +947,13 @@ void Curl_schannel_close(struct connectdata *conn, int sockindex) {
   }
 }
 
-int Curl_schannel_shutdown(struct connectdata *conn, int sockindex) {
+int Curl_schannel_shutdown(struct connectdata *conn, int sockindex)
+{
   return CURLE_NOT_BUILT_IN; /* TODO: implement SSL/TLS shutdown */
 }
 
-void Curl_schannel_session_free(void *ptr) {
+void Curl_schannel_session_free(void *ptr)
+{
   curl_schannel_cred *cred = ptr;
 
   if(cred) {
@@ -950,11 +962,13 @@ void Curl_schannel_session_free(void *ptr) {
   }
 }
 
-int Curl_schannel_init() {
+int Curl_schannel_init()
+{
   return (Curl_sspi_global_init() == CURLE_OK ? 1 : 0);
 }
 
-void Curl_schannel_cleanup() {
+void Curl_schannel_cleanup()
+{
   Curl_sspi_global_cleanup();
 }
 
