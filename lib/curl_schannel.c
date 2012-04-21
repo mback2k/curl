@@ -250,7 +250,7 @@ schannel_connect_step2(struct connectdata *conn, int sockindex) {
   /* buffer to store previously received and encrypted data */
   if(connssl->encdata_buffer == NULL) {
     connssl->encdata_offset = 0;
-    connssl->encdata_length = 4096;
+    connssl->encdata_length = CURL_SCHANNEL_BUFFER_INIT_SIZE;
     connssl->encdata_buffer = malloc(connssl->encdata_length);
     if(connssl->encdata_buffer == NULL) {
       failf(data, "schannel: unable to allocate memory");
@@ -670,7 +670,7 @@ schannel_recv(struct connectdata *conn, int sockindex,
   /* buffer to store previously received and decrypted data */
   if(connssl->decdata_buffer == NULL) {
     connssl->decdata_offset = 0;
-    connssl->decdata_length = 4096;
+    connssl->decdata_length = CURL_SCHANNEL_BUFFER_INIT_SIZE;
     connssl->decdata_buffer = malloc(connssl->decdata_length);
     if(connssl->decdata_buffer == NULL) {
       failf(data, "schannel: unable to allocate memory");
@@ -679,10 +679,10 @@ schannel_recv(struct connectdata *conn, int sockindex,
   }
 
   /* increase buffer in order to fit the requested amount of data */
-  while(connssl->encdata_length - connssl->encdata_offset < 2048 ||
-        connssl->encdata_length < len) {
+  while(connssl->encdata_length - connssl->encdata_offset <
+        CURL_SCHANNEL_BUFFER_STEP_SIZE || connssl->encdata_length < len) {
     /* increase internal encrypted data buffer */
-    connssl->encdata_length += 2048;
+    connssl->encdata_length += CURL_SCHANNEL_BUFFER_STEP_SIZE;
     connssl->encdata_buffer = realloc(connssl->encdata_buffer,
                                       connssl->encdata_length);
     if(connssl->encdata_buffer == NULL) {
@@ -760,7 +760,8 @@ schannel_recv(struct connectdata *conn, int sockindex,
         infof(data, "schannel: decrypted data length: %d\n", inbuf[1].cbBuffer);
 
         /* increase buffer in order to fit the received amount of data */
-        size = inbuf[1].cbBuffer > 2048 ? inbuf[1].cbBuffer : 2048;
+        size = inbuf[1].cbBuffer > CURL_SCHANNEL_BUFFER_STEP_SIZE ?
+               inbuf[1].cbBuffer : CURL_SCHANNEL_BUFFER_STEP_SIZE;
         while(connssl->decdata_length - connssl->decdata_offset < size ||
               connssl->decdata_length < len) {
           /* increase internal decrypted data buffer */
@@ -839,15 +840,17 @@ schannel_recv(struct connectdata *conn, int sockindex,
   }
 
   /* reduce internal buffer length to reduce memory usage */
-  if(connssl->encdata_length > 4096) {
-    connssl->encdata_length = connssl->encdata_offset > 4096 ?
-                              connssl->encdata_offset : 4096;
+  if(connssl->encdata_length > CURL_SCHANNEL_BUFFER_INIT_SIZE) {
+    connssl->encdata_length =
+      connssl->encdata_offset > CURL_SCHANNEL_BUFFER_INIT_SIZE ?
+      connssl->encdata_offset : CURL_SCHANNEL_BUFFER_INIT_SIZE;
     connssl->encdata_buffer = realloc(connssl->encdata_buffer,
                                       connssl->encdata_length);
   }
-  if(connssl->decdata_length > 4096) {
-    connssl->decdata_length = connssl->decdata_offset > 4096 ?
-                              connssl->decdata_offset : 4096;
+  if(connssl->decdata_length > CURL_SCHANNEL_BUFFER_INIT_SIZE) {
+    connssl->decdata_length =
+      connssl->decdata_offset > CURL_SCHANNEL_BUFFER_INIT_SIZE ?
+      connssl->decdata_offset : CURL_SCHANNEL_BUFFER_INIT_SIZE;
     connssl->decdata_buffer = realloc(connssl->decdata_buffer,
                                       connssl->decdata_length);
   }
