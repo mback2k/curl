@@ -88,7 +88,7 @@ schannel_connect_step1(struct connectdata *conn, int sockindex)
   SecBufferDesc outbuf_desc;
   SCHANNEL_CRED schannel_cred;
   SECURITY_STATUS sspi_status = SEC_E_OK;
-  curl_schannel_cred *old_cred = NULL;
+  struct curl_schannel_cred *old_cred = NULL;
   char *sspi_msg = NULL;
   struct in_addr addr;
 #ifdef ENABLE_IPV6
@@ -144,12 +144,12 @@ schannel_connect_step1(struct connectdata *conn, int sockindex)
     }
 
     /* allocate memory for the re-usable credential handle */
-    connssl->cred = malloc(sizeof(curl_schannel_cred));
+    connssl->cred = malloc(sizeof(struct curl_schannel_cred));
     if (!connssl->cred) {
       failf(data, "schannel: unable to allocate memory");
       return CURLE_OUT_OF_MEMORY;
     }
-    memset(connssl->cred, 0, sizeof(curl_schannel_cred));
+    memset(connssl->cred, 0, sizeof(struct curl_schannel_cred));
 
     /* http://msdn.microsoft.com/en-us/library/windows/desktop/aa374716.aspx */
     sspi_status = s_pSecFn->AcquireCredentialsHandle(NULL,
@@ -186,12 +186,12 @@ schannel_connect_step1(struct connectdata *conn, int sockindex)
                        ISC_REQ_ALLOCATE_MEMORY | ISC_REQ_STREAM;
 
   /* allocate memory for the security context handle */
-  connssl->ctxt = malloc(sizeof(curl_schannel_ctxt));
+  connssl->ctxt = malloc(sizeof(struct curl_schannel_ctxt));
   if (!connssl->ctxt) {
     failf(data, "schannel: unable to allocate memory");
     return CURLE_OUT_OF_MEMORY;
   }
-  memset(connssl->ctxt, 0, sizeof(curl_schannel_ctxt));
+  memset(connssl->ctxt, 0, sizeof(struct curl_schannel_ctxt));
 
   /* http://msdn.microsoft.com/en-us/library/windows/desktop/aa375924.aspx */
   sspi_status = s_pSecFn->InitializeSecurityContext(
@@ -408,7 +408,7 @@ schannel_connect_step3(struct connectdata *conn, int sockindex)
   CURLcode retcode = CURLE_OK;
   struct SessionHandle *data = conn->data;
   struct ssl_connect_data *connssl = &conn->ssl[sockindex];
-  curl_schannel_cred *old_cred = NULL;
+  struct curl_schannel_cred *old_cred = NULL;
   int incache;
 
   DEBUGASSERT(ssl_connect_3 == connssl->connecting_state);
@@ -444,7 +444,7 @@ schannel_connect_step3(struct connectdata *conn, int sockindex)
   }
   if(!incache) {
     retcode = Curl_ssl_addsessionid(conn, (void*)connssl->cred,
-                                    sizeof(curl_schannel_cred));
+                                    sizeof(struct curl_schannel_cred));
     if(retcode) {
       failf(data, "schannel: failed to store credential handle\n");
       return retcode;
@@ -954,7 +954,7 @@ int Curl_schannel_shutdown(struct connectdata *conn, int sockindex)
 
 void Curl_schannel_session_free(void *ptr)
 {
-  curl_schannel_cred *cred = ptr;
+  struct curl_schannel_cred *cred = ptr;
 
   if(cred) {
     s_pSecFn->FreeCredentialsHandle(&cred->cred_handle);
