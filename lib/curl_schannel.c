@@ -86,6 +86,22 @@
 static Curl_recv schannel_recv;
 static Curl_send schannel_send;
 
+static void InitSecBuffer(SecBuffer *buffer, unsigned int type,
+                          void *data, size_t length)
+{
+  buffer->BufferType = type;
+  buffer->pvBuffer = data;
+  buffer->cbBuffer = length;
+}
+
+static void InitSecBufferDesc(SecBufferDesc *desc, SecBuffer *buffers,
+                              size_t number)
+{
+  desc->pBuffers = buffers;
+  desc->ulVersion = SECBUFFER_VERSION;
+  desc->cBuffers = number;
+}
+
 static CURLcode
 schannel_connect_step1(struct connectdata *conn, int sockindex)
 {
@@ -181,13 +197,8 @@ schannel_connect_step1(struct connectdata *conn, int sockindex)
   }
 
   /* setup output buffer */
-  outbuf.pvBuffer = NULL;
-  outbuf.cbBuffer = 0;
-  outbuf.BufferType = SECBUFFER_EMPTY;
-
-  outbuf_desc.pBuffers = &outbuf;
-  outbuf_desc.cBuffers = 1;
-  outbuf_desc.ulVersion = SECBUFFER_VERSION;
+  InitSecBuffer(&outbuf, SECBUFFER_EMPTY, NULL, 0);
+  InitSecBufferDesc(&outbuf_desc, &outbuf, 1);
 
   /* setup request flags */
   connssl->req_flags = ISC_REQ_SEQUENCE_DETECT | ISC_REQ_REPLAY_DETECT |
@@ -314,30 +325,15 @@ schannel_connect_step2(struct connectdata *conn, int sockindex)
         connssl->encdata_offset, connssl->encdata_length);
 
   /* setup input buffers */
-  inbuf[0].pvBuffer = malloc(connssl->encdata_offset);
-  inbuf[0].cbBuffer = connssl->encdata_offset;
-  inbuf[0].BufferType = SECBUFFER_TOKEN;
-
-  inbuf[1].pvBuffer = NULL;
-  inbuf[1].cbBuffer = 0;
-  inbuf[1].BufferType = SECBUFFER_EMPTY;
-
-  inbuf_desc.pBuffers = &inbuf[0];
-  inbuf_desc.cBuffers = 2;
-  inbuf_desc.ulVersion = SECBUFFER_VERSION;
+  InitSecBuffer(&inbuf[0], SECBUFFER_TOKEN, malloc(connssl->encdata_offset),
+                connssl->encdata_offset);
+  InitSecBuffer(&inbuf[1], SECBUFFER_EMPTY, NULL, 0);
+  InitSecBufferDesc(&inbuf_desc, inbuf, 2);
 
   /* setup output buffers */
-  outbuf[0].pvBuffer = NULL;
-  outbuf[0].cbBuffer = 0;
-  outbuf[0].BufferType = SECBUFFER_TOKEN;
-
-  outbuf[1].pvBuffer = NULL;
-  outbuf[1].cbBuffer = 0;
-  outbuf[1].BufferType = SECBUFFER_ALERT;
-
-  outbuf_desc.pBuffers = &outbuf[0];
-  outbuf_desc.cBuffers = 2;
-  outbuf_desc.ulVersion = SECBUFFER_VERSION;
+  InitSecBuffer(&outbuf[0], SECBUFFER_TOKEN, NULL, 0);
+  InitSecBuffer(&outbuf[1], SECBUFFER_ALERT, NULL, 0);
+  InitSecBufferDesc(&outbuf_desc, outbuf, 2);
 
   if(inbuf[0].pvBuffer == NULL) {
     failf(data, "schannel: unable to allocate memory");
@@ -653,25 +649,15 @@ schannel_send(struct connectdata *conn, int sockindex,
   }
 
   /* setup output buffers (header, data, trailer, empty) */
-  outbuf[0].pvBuffer = data;
-  outbuf[0].cbBuffer = connssl->stream_sizes.cbHeader;
-  outbuf[0].BufferType = SECBUFFER_STREAM_HEADER;
-
-  outbuf[1].pvBuffer = data + connssl->stream_sizes.cbHeader;
-  outbuf[1].cbBuffer = len;
-  outbuf[1].BufferType = SECBUFFER_DATA;
-
-  outbuf[2].pvBuffer = data + connssl->stream_sizes.cbHeader + len;
-  outbuf[2].cbBuffer = connssl->stream_sizes.cbTrailer;
-  outbuf[2].BufferType = SECBUFFER_STREAM_TRAILER;
-
-  outbuf[3].pvBuffer = NULL;
-  outbuf[3].cbBuffer = 0;
-  outbuf[3].BufferType = SECBUFFER_EMPTY;
-
-  outbuf_desc.pBuffers = &outbuf[0];
-  outbuf_desc.cBuffers = 4;
-  outbuf_desc.ulVersion = SECBUFFER_VERSION;
+  InitSecBuffer(&outbuf[0], SECBUFFER_STREAM_HEADER,
+                data, connssl->stream_sizes.cbHeader);
+  InitSecBuffer(&outbuf[1], SECBUFFER_DATA,
+                data + connssl->stream_sizes.cbHeader, len);
+  InitSecBuffer(&outbuf[2], SECBUFFER_STREAM_TRAILER,
+                data + connssl->stream_sizes.cbHeader + len,
+				connssl->stream_sizes.cbTrailer);
+  InitSecBuffer(&outbuf[3], SECBUFFER_EMPTY, NULL, 0);
+  InitSecBufferDesc(&outbuf_desc, outbuf, 4);
 
   /* copy data into output buffer */
   memcpy(outbuf[1].pvBuffer, buf, len);
@@ -770,26 +756,15 @@ schannel_recv(struct connectdata *conn, int sockindex,
   /* check if we still have some data in our buffers */
   while(connssl->encdata_offset > 0 && sspi_status == SEC_E_OK) {
     /* prepare data buffer for DecryptMessage call */
-    inbuf[0].pvBuffer = connssl->encdata_buffer;
-    inbuf[0].cbBuffer = connssl->encdata_offset;
-    inbuf[0].BufferType = SECBUFFER_DATA;
+    InitSecBuffer(&inbuf[0], SECBUFFER_DATA, connssl->encdata_buffer,
+                  connssl->encdata_offset);
 
     /* we need 3 more empty input buffers for possible output */
-    inbuf[1].pvBuffer = NULL;
-    inbuf[1].cbBuffer = 0;
-    inbuf[1].BufferType = SECBUFFER_EMPTY;
+    InitSecBuffer(&inbuf[1], SECBUFFER_EMPTY, NULL, 0);
+    InitSecBuffer(&inbuf[2], SECBUFFER_EMPTY, NULL, 0);
+    InitSecBuffer(&inbuf[3], SECBUFFER_EMPTY, NULL, 0);
 
-    inbuf[2].pvBuffer = NULL;
-    inbuf[2].cbBuffer = 0;
-    inbuf[2].BufferType = SECBUFFER_EMPTY;
-
-    inbuf[3].pvBuffer = NULL;
-    inbuf[3].cbBuffer = 0;
-    inbuf[3].BufferType = SECBUFFER_EMPTY;
-
-    inbuf_desc.pBuffers = &inbuf[0];
-    inbuf_desc.cBuffers = 4;
-    inbuf_desc.ulVersion = SECBUFFER_VERSION;
+    InitSecBufferDesc(&inbuf_desc, inbuf, 4);
 
     /* http://msdn.microsoft.com/en-us/library/windows/desktop/aa375348.aspx */
     sspi_status = s_pSecFn->DecryptMessage(&connssl->ctxt->ctxt_handle,
