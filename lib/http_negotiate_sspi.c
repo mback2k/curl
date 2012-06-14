@@ -36,7 +36,9 @@
 
 #define _MPRINTF_REPLACE /* use our functions only */
 #include <curl/mprintf.h>
-
+#if defined(UNICODE)
+#include "curl_win32_multibyte.h"
+#endif
 /* The last #include file should be: */
 #include "memdebug.h"
 
@@ -90,7 +92,9 @@ int Curl_input_negotiate(struct connectdata *conn, bool proxy,
   SecBuffer         in_sec_buff;
   ULONG             context_attributes;
   TimeStamp         lifetime;
-
+#ifdef UNICODE
+  wchar_t *         wserver;
+#endif
   int ret;
   size_t len = 0, input_token_len = 0;
   bool gss = FALSE;
@@ -137,7 +141,7 @@ int Curl_input_negotiate(struct connectdata *conn, bool proxy,
 
   if(!neg_ctx->output_token) {
     PSecPkgInfo SecurityPackage;
-    ret = s_pSecFn->QuerySecurityPackageInfo((SEC_CHAR *)"Negotiate",
+    ret = s_pSecFn->QuerySecurityPackageInfo(TEXT("Negotiate"),
                                              &SecurityPackage);
     if(ret != SEC_E_OK)
       return -1;
@@ -166,7 +170,7 @@ int Curl_input_negotiate(struct connectdata *conn, bool proxy,
       return -1;
 
     neg_ctx->status =
-      s_pSecFn->AcquireCredentialsHandle(NULL, (SEC_CHAR *)"Negotiate",
+      s_pSecFn->AcquireCredentialsHandle(NULL, TEXT("Negotiate"),
                                          SECPKG_CRED_OUTBOUND, NULL, NULL,
                                          NULL, NULL, neg_ctx->credentials,
                                          &lifetime);
@@ -205,10 +209,20 @@ int Curl_input_negotiate(struct connectdata *conn, bool proxy,
     in_sec_buff.pvBuffer   = input_token;
   }
 
+#ifdef UNICODE
+  wserver = _curl_win32_UTF8_to_wchar(neg_ctx->server_name);
+  if (!wserver)
+    return CURLE_OUT_OF_MEMORY;
+#endif
+
   neg_ctx->status = s_pSecFn->InitializeSecurityContext(
     neg_ctx->credentials,
     input_token ? neg_ctx->context : 0,
+#ifdef UNICODE
+    wserver,
+#else
     neg_ctx->server_name,
+#endif
     ISC_REQ_CONFIDENTIALITY,
     0,
     SECURITY_NATIVE_DREP,
@@ -218,6 +232,10 @@ int Curl_input_negotiate(struct connectdata *conn, bool proxy,
     &out_buff_desc,
     &context_attributes,
     &lifetime);
+
+#ifdef UNICODE
+  free(wserver);
+#endif
 
   if(GSS_ERROR(neg_ctx->status))
     return -1;

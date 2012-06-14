@@ -349,12 +349,14 @@
 #  include <io.h>
 #  include <sys/types.h>
 #  include <sys/stat.h>
+#ifndef _WIN32_WCE
 #  undef  lseek
 #  define lseek(fdes,offset,whence)  _lseek(fdes, (long)offset, whence)
 #  define fstat(fdes,stp)            _fstat(fdes, stp)
 #  define stat(fname,stp)            _stat(fname, stp)
 #  define struct_stat                struct _stat
 #  define LSEEK_ERROR                (long)-1
+#endif
 #endif
 
 #ifndef struct_stat
@@ -593,6 +595,15 @@ int netware_init(void);
    defined(USE_GNUTLS) || defined(USE_NSS)
 #define USE_NTLM
 #endif
+#endif
+
+/* libcurl uses ANSI c strings; Windows generally has
+   ANSI and wide char equivalent functions.  Exceptions require
+   conversion routines between wide and ANSI strings.
+   Exceptions: IDN API, WinCE
+*/
+#if defined(USE_WIN32_IDN) || ((defined(_W32_WINCE) || defined(UNICODE)) && defined(USE_WINDOWS_SSPI))
+#define USE_WINDOWS_MULTIBYTE_CONVERSION
 #endif
 
 /* non-configure builds may define CURL_WANTS_CA_BUNDLE_ENV */

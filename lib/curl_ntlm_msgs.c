@@ -79,6 +79,9 @@
 
 #elif defined(USE_WINDOWS_SSPI)
 #  include "curl_sspi.h"
+#if defined(UNICODE)
+#  include "curl_win32_multibyte.h"
+#endif
 #else
 #  error "Can't compile NTLM support without a crypto library."
 #endif
@@ -394,7 +397,6 @@ CURLcode Curl_ntlm_create_type1_message(const char *userp,
   SecBufferDesc desc;
   SECURITY_STATUS status;
   ULONG attrs;
-  const char *dest = "";
   const char *user;
   const char *domain = "";
   size_t userlen = 0;
@@ -431,11 +433,19 @@ CURLcode Curl_ntlm_create_type1_message(const char *userp,
      */
     ntlm->p_identity = &ntlm->identity;
     memset(ntlm->p_identity, 0, sizeof(*ntlm->p_identity));
+#ifdef UNICODE
+    if ((ntlm->identity.User = _curl_win32_UTF8_to_wchar(user)) == NULL)
+#else
     if((ntlm->identity.User = (unsigned char *)strdup(user)) == NULL)
+#endif
       return CURLE_OUT_OF_MEMORY;
 
     ntlm->identity.UserLength = (unsigned long)userlen;
+#ifdef UNICODE
+    if((ntlm->identity.Password = _curl_win32_UTF8_to_wchar(passwdp)) == NULL)
+#else
     if((ntlm->identity.Password = (unsigned char *)strdup(passwdp)) == NULL)
+#endif
       return CURLE_OUT_OF_MEMORY;
 
     ntlm->identity.PasswordLength = (unsigned long)passwdlen;
@@ -450,10 +460,10 @@ CURLcode Curl_ntlm_create_type1_message(const char *userp,
   else
     ntlm->p_identity = NULL;
 
-  status = s_pSecFn->AcquireCredentialsHandleA(NULL, (void *)"NTLM",
-                                               SECPKG_CRED_OUTBOUND, NULL,
-                                               ntlm->p_identity, NULL, NULL,
-                                               &ntlm->handle, &tsDummy);
+  status = s_pSecFn->AcquireCredentialsHandle(NULL, TEXT("NTLM"),
+                                              SECPKG_CRED_OUTBOUND, NULL,
+                                              ntlm->p_identity, NULL, NULL,
+                                              &ntlm->handle, &tsDummy);
   if(status != SEC_E_OK)
     return CURLE_OUT_OF_MEMORY;
 
@@ -464,15 +474,15 @@ CURLcode Curl_ntlm_create_type1_message(const char *userp,
   buf.BufferType = SECBUFFER_TOKEN;
   buf.pvBuffer   = ntlmbuf;
 
-  status = s_pSecFn->InitializeSecurityContextA(&ntlm->handle, NULL,
-                                                (void *)dest,
-                                                ISC_REQ_CONFIDENTIALITY |
-                                                ISC_REQ_REPLAY_DETECT |
-                                                ISC_REQ_CONNECTION,
-                                                0, SECURITY_NETWORK_DREP,
-                                                NULL, 0,
-                                                &ntlm->c_handle, &desc,
-                                                &attrs, &tsDummy);
+  status = s_pSecFn->InitializeSecurityContext(&ntlm->handle, NULL,
+                                               TEXT(""),
+                                               ISC_REQ_CONFIDENTIALITY |
+                                               ISC_REQ_REPLAY_DETECT |
+                                               ISC_REQ_CONNECTION,
+                                               0, SECURITY_NETWORK_DREP,
+                                               NULL, 0,
+                                               &ntlm->c_handle, &desc,
+                                               &attrs, &tsDummy);
 
   if(status == SEC_I_COMPLETE_AND_CONTINUE ||
      status == SEC_I_CONTINUE_NEEDED)
@@ -615,7 +625,6 @@ CURLcode Curl_ntlm_create_type3_message(struct SessionHandle *data,
   size_t size;
 
 #ifdef USE_WINDOWS_SSPI
-  const char *dest = "";
   SecBuffer type_2;
   SecBuffer type_3;
   SecBufferDesc type_2_desc;
@@ -640,17 +649,17 @@ CURLcode Curl_ntlm_create_type3_message(struct SessionHandle *data,
   type_3.pvBuffer   = ntlmbuf;
   type_3.cbBuffer   = NTLM_BUFSIZE;
 
-  status = s_pSecFn->InitializeSecurityContextA(&ntlm->handle,
-                                                &ntlm->c_handle,
-                                                (void *)dest,
-                                                ISC_REQ_CONFIDENTIALITY |
-                                                ISC_REQ_REPLAY_DETECT |
-                                                ISC_REQ_CONNECTION,
-                                                0, SECURITY_NETWORK_DREP,
-                                                &type_2_desc,
-                                                0, &ntlm->c_handle,
-                                                &type_3_desc,
-                                                &attrs, &tsDummy);
+  status = s_pSecFn->InitializeSecurityContext(&ntlm->handle,
+                                               &ntlm->c_handle,
+                                               TEXT(""),
+                                               ISC_REQ_CONFIDENTIALITY |
+                                               ISC_REQ_REPLAY_DETECT |
+                                               ISC_REQ_CONNECTION,
+                                               0, SECURITY_NETWORK_DREP,
+                                               &type_2_desc,
+                                               0, &ntlm->c_handle,
+                                               &type_3_desc,
+                                               &attrs, &tsDummy);
   if(status != SEC_E_OK)
     return CURLE_RECV_ERROR;
 

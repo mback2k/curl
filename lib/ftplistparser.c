@@ -37,6 +37,8 @@
 
 #include "setup.h"
 
+#ifndef CURL_DISABLE_FTP
+
 #include "ftplistparser.h"
 #include "curl_fnmatch.h"
 
@@ -1044,3 +1046,5 @@ size_t Curl_ftp_parselist(char *buffer, size_t size, size_t nmemb,
 
   return bufflen;
 }
+
+#endif

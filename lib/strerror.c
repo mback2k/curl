@@ -635,8 +635,8 @@ const char *Curl_strerror(struct connectdata *conn, int err)
     strncpy(buf, strerror(err), max);
   else {
     if(!get_winsock_error(err, buf, max) &&
-        !FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, err,
-                       LANG_NEUTRAL, buf, (DWORD)max, NULL))
+        !FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, NULL, err,
+                        LANG_NEUTRAL, buf, (DWORD)max, NULL))
       snprintf(buf, max, "Unknown error %d (%#x)", err, err);
   }
 #endif
@@ -1057,18 +1057,32 @@ const char *Curl_sspi_strerror (struct connectdata *conn, int err)
     snprintf(txtbuf, sizeof(txtbuf), "%s (0x%04X%04X)",
              txt, (err >> 16) & 0xffff, err & 0xffff);
     txtbuf[sizeof(txtbuf)-1] = '\0';
-    if(FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM |
+
+    {
+      char *p;
+#ifdef _WIN32_WCE
+      wchar_t wbuf[256];
+      wbuf[0] = L'\0';
+
+      if(FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM |
                      FORMAT_MESSAGE_IGNORE_INSERTS,
                      NULL, err, LANG_NEUTRAL,
-                     msgbuf, sizeof(msgbuf)-1, NULL)) {
-      char *p;
-      msgbuf[sizeof(msgbuf)-1] = '\0';
-      /* strip trailing '\r\n' or '\n' */
-      if((p = strrchr(msgbuf,'\n')) != NULL && (p - msgbuf) >= 2)
-         *p = '\0';
-      if((p = strrchr(msgbuf,'\r')) != NULL && (p - msgbuf) >= 1)
-         *p = '\0';
-      msg = msgbuf;
+                     wbuf, sizeof(wbuf)/sizeof(wchar_t), NULL)) {
+        wcstombs(msgbuf,wbuf,sizeof(msgbuf)-1);
+#else
+      if(FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM |
+                      FORMAT_MESSAGE_IGNORE_INSERTS,
+                      NULL, err, LANG_NEUTRAL,
+                      msgbuf, sizeof(msgbuf)-1, NULL)) {
+#endif
+        msgbuf[sizeof(msgbuf)-1] = '\0';
+        /* strip trailing '\r\n' or '\n' */
+        if((p = strrchr(msgbuf,'\n')) != NULL && (p - msgbuf) >= 2)
+           *p = '\0';
+        if((p = strrchr(msgbuf,'\r')) != NULL && (p - msgbuf) >= 1)
+           *p = '\0';
+        msg = msgbuf;
+      }
     }
     if(msg)
       snprintf(outbuf, outmax, "%s - %s", str, msg);
