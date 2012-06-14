@@ -238,7 +238,8 @@ schannel_connect_step1(struct connectdata *conn, int sockindex)
         "sending %lu bytes...\n", outbuf.cbBuffer);
 
   /* send initial handshake data which is now stored in output buffer */
-  written = swrite(conn->sock[sockindex], outbuf.pvBuffer, outbuf.cbBuffer);
+  Curl_write_plain(conn, conn->sock[sockindex], outbuf.pvBuffer,
+                   outbuf.cbBuffer, &written);
   s_pSecFn->FreeContextBuffer(outbuf.pvBuffer);
   if(outbuf.cbBuffer != (size_t)written) {
     failf(data, "schannel: failed to send initial handshake data: "
@@ -270,6 +271,7 @@ schannel_connect_step2(struct connectdata *conn, int sockindex)
 #ifdef UNICODE
   wchar_t * whost;
 #endif
+  CURLcode result;
 
   infof(data, "schannel: connecting to %s:%hu (step 2/3)\n",
         conn->host.name, conn->remote_port);
@@ -286,21 +288,24 @@ schannel_connect_step2(struct connectdata *conn, int sockindex)
   }
 
   /* read encrypted handshake data from socket */
-  nread = sread(conn->sock[sockindex],
-                connssl->encdata_buffer + connssl->encdata_offset,
-                connssl->encdata_length - connssl->encdata_offset);
+  result = Curl_read_plain(conn->sock[sockindex],
+                    (char*)(connssl->encdata_buffer + connssl->encdata_offset),
+                           connssl->encdata_length - connssl->encdata_offset,
+                           &nread);
+
   if(nread > 0) {
     /* increase encrypted data buffer offset */
     connssl->encdata_offset += nread;
   }
   else if(connssl->connecting_state != ssl_connect_2_writing) {
-    if(nread < 0) {
+    if(result == CURLE_AGAIN) {
       connssl->connecting_state = ssl_connect_2_reading;
       infof(data, "schannel: failed to receive handshake, need more data\n");
       return CURLE_OK;
     }
-    else if(nread == 0) {
-      failf(data, "schannel: failed to receive handshake, connection failed");
+    else {
+      failf(data, "schannel: failed to receive handshake, connection "
+            "failed");
       return CURLE_SSL_CONNECT_ERROR;
     }
   }
@@ -382,8 +387,8 @@ schannel_connect_step2(struct connectdata *conn, int sockindex)
               "sending %lu bytes...\n", outbuf[i].cbBuffer);
 
         /* send handshake token to server */
-        written = swrite(conn->sock[sockindex],
-                         outbuf[i].pvBuffer, outbuf[i].cbBuffer);
+        Curl_write_plain(conn, conn->sock[sockindex],
+                         outbuf[i].pvBuffer, outbuf[i].cbBuffer, &written);
         if(outbuf[i].cbBuffer != (size_t)written) {
           failf(data, "schannel: failed to send next handshake data: "
                 "sent %zd of %lu bytes", written, outbuf[i].cbBuffer);
@@ -679,7 +684,7 @@ schannel_send(struct connectdata *conn, int sockindex,
   if(sspi_status == SEC_E_OK) {
     /* send the encrypted message including header, data and trailer */
     len = outbuf[0].cbBuffer + outbuf[1].cbBuffer + outbuf[2].cbBuffer;
-    written = swrite(conn->sock[sockindex], data, len);
+    Curl_write_plain(conn, conn->sock[sockindex], data, len, &written);
     /* TODO: implement write buffering */
   }
   else if(sspi_status == SEC_E_INSUFFICIENT_MEMORY) {
@@ -741,8 +746,9 @@ schannel_recv(struct connectdata *conn, int sockindex,
         connssl->encdata_offset, connssl->encdata_length);
   size = connssl->encdata_length - connssl->encdata_offset;
   if(size > 0) {
-    nread = sread(conn->sock[sockindex],
-                  connssl->encdata_buffer + connssl->encdata_offset, size);
+    *err = Curl_read_plain(conn->sock[sockindex],
+                    (char*)(connssl->encdata_buffer + connssl->encdata_offset),
+                    size, &nread);
     infof(data, "schannel: encrypted data got %zd\n", nread);
 
     /* check for received data */
