@@ -411,132 +411,148 @@ schannel_connect_step2(struct connectdata *conn, int sockindex)
     }
   }
 
-  /* read encrypted handshake data from socket */
-  result = Curl_read_plain(conn->sock[sockindex],
+  for (;;) {
+    if (connssl->encdata_offset == 0 ||
+        sspi_status == SEC_E_INCOMPLETE_MESSAGE) {
+      /* read encrypted handshake data from socket */
+      result = Curl_read_plain(conn->sock[sockindex],
                     (char*)(connssl->encdata_buffer + connssl->encdata_offset),
                            connssl->encdata_length - connssl->encdata_offset,
                            &nread);
 
-  if(nread > 0) {
-    /* increase encrypted data buffer offset */
-    connssl->encdata_offset += nread;
-  }
-  else if(connssl->connecting_state != ssl_connect_2_writing) {
-    if(result == CURLE_AGAIN) {
-      connssl->connecting_state = ssl_connect_2_reading;
-      infof(data, "schannel: failed to receive handshake, need more data\n");
-      return CURLE_OK;
-    }
-    else {
-      failf(data, "schannel: failed to receive handshake, connection "
-            "failed");
-      return CURLE_SSL_CONNECT_ERROR;
-    }
-  }
-
-  infof(data, "schannel: encrypted data buffer: offset %zu length %zu\n",
-        connssl->encdata_offset, connssl->encdata_length);
-
-  /* setup input buffers */
-  InitSecBuffer(&inbuf[0], SECBUFFER_TOKEN, malloc(connssl->encdata_offset),
-                connssl->encdata_offset);
-  InitSecBuffer(&inbuf[1], SECBUFFER_EMPTY, NULL, 0);
-  InitSecBufferDesc(&inbuf_desc, inbuf, 2);
-
-  /* setup output buffers */
-  InitSecBuffer(&outbuf[0], SECBUFFER_TOKEN, NULL, 0);
-  InitSecBuffer(&outbuf[1], SECBUFFER_ALERT, NULL, 0);
-  InitSecBufferDesc(&outbuf_desc, outbuf, 2);
-
-  if(inbuf[0].pvBuffer == NULL) {
-    failf(data, "schannel: unable to allocate memory");
-    return CURLE_OUT_OF_MEMORY;
-  }
-
-  /* copy received handshake data into input buffer */
-  memcpy(inbuf[0].pvBuffer, connssl->encdata_buffer, connssl->encdata_offset);
-
-#ifdef UNICODE
-  whost = _curl_win32_UTF8_to_wchar(conn->host.name);
-  if (whost == NULL)
-    return CURLE_OUT_OF_MEMORY;
-#endif
-
-  /* http://msdn.microsoft.com/en-us/library/windows/desktop/aa375924.aspx */
-  sspi_status = s_pSecFn->InitializeSecurityContext(
-    &connssl->cred->cred_handle, &connssl->ctxt->ctxt_handle,
-#ifdef UNICODE
-    whost,
-#else
-    conn->host.name,
-#endif
-    connssl->req_flags, 0, 0, &inbuf_desc, 0, NULL,
-    &outbuf_desc, &connssl->ret_flags, &connssl->ctxt->time_stamp);
-
-#ifdef UNICODE
-  free(whost);
-#endif
-
-  /* free buffer for received handshake data */
-  free(inbuf[0].pvBuffer);
-
-  /* check if the handshake was incomplete */
-  if(sspi_status == SEC_E_INCOMPLETE_MESSAGE) {
-    connssl->connecting_state = ssl_connect_2_reading;
-    infof(data, "schannel: received incomplete message, need more data\n");
-    return CURLE_OK;
-  }
-
-  /* check if the handshake needs to be continued */
-  if(sspi_status == SEC_I_CONTINUE_NEEDED || sspi_status == SEC_E_OK) {
-    for(i = 0; i < 2; i++) {
-      /* search for handshake tokens that need to be send */
-      if(outbuf[i].BufferType == SECBUFFER_TOKEN && outbuf[i].cbBuffer > 0) {
-        infof(data, "schannel: sending next handshake data: "
-              "sending %lu bytes...\n", outbuf[i].cbBuffer);
-
-        /* send handshake token to server */
-        Curl_write_plain(conn, conn->sock[sockindex],
-                         outbuf[i].pvBuffer, outbuf[i].cbBuffer, &written);
-        if(outbuf[i].cbBuffer != (size_t)written) {
-          failf(data, "schannel: failed to send next handshake data: "
-                "sent %zd of %lu bytes", written, outbuf[i].cbBuffer);
+      if(nread > 0) {
+        /* increase encrypted data buffer offset */
+        connssl->encdata_offset += nread;
+      }
+      else if(connssl->connecting_state != ssl_connect_2_writing) {
+        if(result == CURLE_AGAIN) {
+          connssl->connecting_state = ssl_connect_2_reading;
+          infof(data, "schannel: failed to receive handshake, need more data\n");
+          return CURLE_OK;
+        }
+        else {
+          failf(data, "schannel: failed to receive handshake, connection "
+                      "failed");
           return CURLE_SSL_CONNECT_ERROR;
         }
       }
+    }
 
-      /* free obsolete buffer */
-      if(outbuf[i].pvBuffer != NULL) {
-        s_pSecFn->FreeContextBuffer(outbuf[i].pvBuffer);
+    infof(data, "schannel: encrypted data buffer: offset %zu length %zu\n",
+        connssl->encdata_offset, connssl->encdata_length);
+
+    /* setup input buffers */
+    InitSecBuffer(&inbuf[0], SECBUFFER_TOKEN, malloc(connssl->encdata_offset),
+                  connssl->encdata_offset);
+    InitSecBuffer(&inbuf[1], SECBUFFER_EMPTY, NULL, 0);
+    InitSecBufferDesc(&inbuf_desc, inbuf, 2);
+
+    /* setup output buffers */
+    InitSecBuffer(&outbuf[0], SECBUFFER_TOKEN, NULL, 0);
+    InitSecBuffer(&outbuf[1], SECBUFFER_ALERT, NULL, 0);
+    InitSecBufferDesc(&outbuf_desc, outbuf, 2);
+
+    if(inbuf[0].pvBuffer == NULL) {
+      failf(data, "schannel: unable to allocate memory");
+      return CURLE_OUT_OF_MEMORY;
+    }
+
+    /* copy received handshake data into input buffer */
+    memcpy(inbuf[0].pvBuffer, connssl->encdata_buffer, connssl->encdata_offset);
+
+#ifdef UNICODE
+    whost = _curl_win32_UTF8_to_wchar(conn->host.name);
+    if (whost == NULL)
+      return CURLE_OUT_OF_MEMORY;
+#endif
+
+    /* http://msdn.microsoft.com/en-us/library/windows/desktop/aa375924.aspx */
+    sspi_status = s_pSecFn->InitializeSecurityContext(
+                &connssl->cred->cred_handle, &connssl->ctxt->ctxt_handle,
+#ifdef UNICODE
+                whost,
+#else
+                conn->host.name,
+#endif
+                connssl->req_flags, 0, 0, &inbuf_desc, 0, NULL,
+                &outbuf_desc, &connssl->ret_flags, &connssl->ctxt->time_stamp);
+
+#ifdef UNICODE
+    free(whost);
+#endif
+
+    /* free buffer for received handshake data */
+    free(inbuf[0].pvBuffer);
+
+    /* check if the handshake was incomplete */
+    if(sspi_status == SEC_E_INCOMPLETE_MESSAGE) {
+      connssl->connecting_state = ssl_connect_2_reading;
+      infof(data, "schannel: received incomplete message, need more data\n");
+      return CURLE_OK;
+    }
+
+    /* check if the handshake needs to be continued */
+    if(sspi_status == SEC_I_CONTINUE_NEEDED || sspi_status == SEC_E_OK) {
+      for(i = 0; i < 2; i++) {
+        /* search for handshake tokens that need to be send */
+        if(outbuf[i].BufferType == SECBUFFER_TOKEN && outbuf[i].cbBuffer > 0) {
+          infof(data, "schannel: sending next handshake data: "
+                "sending %lu bytes...\n", outbuf[i].cbBuffer);
+
+          /* send handshake token to server */
+          Curl_write_plain(conn, conn->sock[sockindex],
+                           outbuf[i].pvBuffer, outbuf[i].cbBuffer, &written);
+          if(outbuf[i].cbBuffer != (size_t)written) {
+            failf(data, "schannel: failed to send next handshake data: "
+                  "sent %zd of %lu bytes", written, outbuf[i].cbBuffer);
+            return CURLE_SSL_CONNECT_ERROR;
+          }
+        }
+
+        /* free obsolete buffer */
+        if(outbuf[i].pvBuffer != NULL) {
+          s_pSecFn->FreeContextBuffer(outbuf[i].pvBuffer);
+        }
       }
     }
-  }
-  else {
-    if(sspi_status == SEC_E_WRONG_PRINCIPAL)
-      failf(data, "schannel: SNI or certificate check failed: %s",
-            Curl_sspi_strerror(conn, sspi_status));
-    else
-      failf(data, "schannel: next InitializeSecurityContext failed: %s",
-            Curl_sspi_strerror(conn, sspi_status));
-    return CURLE_SSL_CONNECT_ERROR;
-  }
-
-  /* check if there was additional remaining encrypted data */
-  if(inbuf[1].BufferType == SECBUFFER_EXTRA && inbuf[1].cbBuffer > 0) {
-    infof(data, "schannel: encrypted data length: %lu\n", inbuf[1].cbBuffer);
-
-    /* check if the remaining data is less than the total amount
-     * and therefore begins after the already processed data
-     */
-    if(connssl->encdata_offset > inbuf[1].cbBuffer) {
-      memmove(connssl->encdata_buffer,
-              (connssl->encdata_buffer + connssl->encdata_offset) -
-                inbuf[1].cbBuffer, inbuf[1].cbBuffer);
-      connssl->encdata_offset = inbuf[1].cbBuffer;
+    else {
+      if(sspi_status == SEC_E_WRONG_PRINCIPAL)
+        failf(data, "schannel: SNI or certificate check failed: %s",
+              Curl_sspi_strerror(conn, sspi_status));
+      else
+        failf(data, "schannel: next InitializeSecurityContext failed: %s",
+              Curl_sspi_strerror(conn, sspi_status));
+      return CURLE_SSL_CONNECT_ERROR;
     }
-  }
-  else {
-    connssl->encdata_offset = 0;
+
+    /* check if there was additional remaining encrypted data */
+    if(inbuf[1].BufferType == SECBUFFER_EXTRA && inbuf[1].cbBuffer > 0) {
+      infof(data, "schannel: encrypted data length: %lu\n", inbuf[1].cbBuffer);
+      /* There are two cases where we could be getting extra data here:
+       * 1) If we're renegotiating a connection and the handshake is already
+       *    complete (from the server perspective), it can encrypted app data
+       *    (not handshake data) in an extra buffer at this point.
+       * 2) (sspi_status == SEC_I_CONTINUE_NEEDED) We are negotiating a
+       *    connection and this extra data is part of the handshake.
+       *    We should process the data immediately; waiting for the socket to
+       *    be ready may fail since the server is done sending handshake data.
+       */
+      /* check if the remaining data is less than the total amount
+       * and therefore begins after the already processed data
+       */
+      if(connssl->encdata_offset > inbuf[1].cbBuffer) {
+        memmove(connssl->encdata_buffer,
+                (connssl->encdata_buffer + connssl->encdata_offset) -
+                  inbuf[1].cbBuffer, inbuf[1].cbBuffer);
+        connssl->encdata_offset = inbuf[1].cbBuffer;
+        if (sspi_status == SEC_I_CONTINUE_NEEDED)
+          continue;
+      }
+    }
+    else {
+      connssl->encdata_offset = 0;
+    }
+    break;
   }
 
   /* check if the handshake needs to be continued */
