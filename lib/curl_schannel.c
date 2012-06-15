@@ -39,7 +39,6 @@
 
 /*
  * TODO list for TLS/SSL implementation:
- * - implement write buffering
  * - implement SSL/TLS shutdown
  * - implement client certificate authentication
  * - implement custom server certificate validation
@@ -668,10 +667,68 @@ schannel_send(struct connectdata *conn, int sockindex,
 
   /* check if the message was encrypted */
   if(sspi_status == SEC_E_OK) {
+    written = 0;
+
     /* send the encrypted message including header, data and trailer */
     len = outbuf[0].cbBuffer + outbuf[1].cbBuffer + outbuf[2].cbBuffer;
-    Curl_write_plain(conn, conn->sock[sockindex], data, len, &written);
-    /* TODO: implement write buffering */
+
+    while (written < (ssize_t)len) {
+      ssize_t this_write;
+      *err = Curl_write_plain(conn, conn->sock[sockindex], data + written,
+                              len - written, &this_write);
+      if (*err == CURLE_OK || *err == CURLE_AGAIN) {
+        written += this_write;
+        if (written == len) {
+          /* The return value is the number of unencrypted bytes that were
+           * sent. */
+          written = outbuf[1].cbBuffer;
+          break;
+        }
+        else {
+          /* It's important to send the full message which includes the header,
+           * encrypted payload, and trailer.  Until the client receives all the
+           * data a coherent message has not been delivered and the client
+           * can't read any of it.
+           * If no bytes were written, we can return CURLE_AGAIN now.
+
+           * If we wanted to buffer the unwritten encrypted bytes, we would
+           * tell the client that all data it has requested to be sent has been
+           * sent. The unwritten encrypted bytes would be the first bytes to
+           * send on the next invocation.
+           * Here's the catch with this - if we tell the client that all the
+           * bytes have been sent, will the client call this method again to
+           * send the buffered data?  Looking at who calls this function, it
+           * seems the answer is NO.
+           */
+          if (written == 0) {
+            *err = CURLE_AGAIN;
+            break;
+          }
+          else {
+            long timeout_ms = Curl_timeleft(conn->data, NULL, FALSE);
+            if (timeout_ms < 0) {
+              /* no need to continue if time already is up */
+              failf(conn->data, "schannel: timed out sending data"
+                    " (bytes sent: %d)", written);
+              *err = CURLE_OPERATION_TIMEDOUT;
+              break;
+            }
+            *err = Curl_socket_ready(CURL_SOCKET_BAD, conn->sock[sockindex],
+                                     timeout_ms);
+            if(*err < 0) {
+              /* fatal error */
+              failf(conn->data, "select/poll on SSL socket, errno: %d",
+                    SOCKERRNO);
+              break;
+            }
+          }
+        }
+      }
+      else {
+        /* *err will be set to CURLE_SEND_ERROR or some error already. */
+        break;
+      }
+    }
   }
   else if(sspi_status == SEC_E_INSUFFICIENT_MEMORY) {
     *err = CURLE_OUT_OF_MEMORY;
