@@ -396,6 +396,7 @@ schannel_connect_step2(struct connectdata *conn, int sockindex)
   wchar_t * whost;
 #endif
   CURLcode result;
+  bool doread = TRUE;
 
   infof(data, "schannel: connecting to %s:%hu (step 2/3)\n",
         conn->host.name, conn->remote_port);
@@ -411,9 +412,20 @@ schannel_connect_step2(struct connectdata *conn, int sockindex)
     }
   }
 
+  /* if we need a bigger buffer to read a full message, increase buffer now */
+  if(connssl->encdata_offset == connssl->encdata_length) {
+    /* increase internal encrypted data buffer */
+    connssl->encdata_length += CURL_SCHANNEL_BUFFER_INIT_SIZE;
+    connssl->encdata_buffer = realloc(connssl->encdata_buffer,
+                                      connssl->encdata_length);
+    if(connssl->encdata_buffer == NULL) {
+      failf(data, "schannel: unable to re-allocate memory");
+      return CURLE_OUT_OF_MEMORY;
+    }
+  }
+
   for (;;) {
-    if (connssl->encdata_offset == 0 ||
-        sspi_status == SEC_E_INCOMPLETE_MESSAGE) {
+    if (doread) {
       /* read encrypted handshake data from socket */
       result = Curl_read_plain(conn->sock[sockindex],
                     (char*)(connssl->encdata_buffer + connssl->encdata_offset),
@@ -545,8 +557,10 @@ schannel_connect_step2(struct connectdata *conn, int sockindex)
                 (connssl->encdata_buffer + connssl->encdata_offset) -
                   inbuf[1].cbBuffer, inbuf[1].cbBuffer);
         connssl->encdata_offset = inbuf[1].cbBuffer;
-        if (sspi_status == SEC_I_CONTINUE_NEEDED)
+        if (sspi_status == SEC_I_CONTINUE_NEEDED) {
+          doread = FALSE;
           continue;
+        }
       }
     }
     else {
