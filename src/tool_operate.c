@@ -821,10 +821,22 @@ static CURLcode operate_do(struct GlobalConfig *global,
          * The circumstances in which it is preferable to enable this
          * behaviour, by omitting to set the READFUNCTION & READDATA options,
          * have not been determined.
+         *
+         * Update on 2015-12-16 by Marc Hoersken:
+         *
+         * The READFUNCTION does not support reading files using stdin on
+         * Windows for lib/telnet.c, because it will block by reading forever.
+         * Therefore the READFUNCTION is only used for non-stdin uploads.
          */
-        my_setopt(curl, CURLOPT_READDATA, &input);
-        /* what call to read */
-        my_setopt(curl, CURLOPT_READFUNCTION, tool_read_cb);
+#if defined(MSDOS) || defined(WIN32)
+        if(infdopen) {
+#endif /* MSDOS || WIN32 */
+          my_setopt(curl, CURLOPT_READDATA, &input);
+          /* what call to read */
+          my_setopt(curl, CURLOPT_READFUNCTION, tool_read_cb);
+#if defined(MSDOS) || defined(WIN32)
+        }
+#endif /* MSDOS || WIN32 */
 
         /* in 7.18.0, the CURLOPT_SEEKFUNCTION/DATA pair is taking over what
            CURLOPT_IOCTLFUNCTION/DATA pair previously provided for seeking */
