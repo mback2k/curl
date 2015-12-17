@@ -478,6 +478,10 @@ static CURLcode operate_do(struct GlobalConfig *global,
         char *this_url = NULL;
         int metalink_next_res = 0;
 
+#if defined(MSDOS) || defined(WIN32)
+        DWORD mode;
+#endif /* MSDOS || WIN32 */
+
         outfile = NULL;
         infdopen = FALSE;
         infd = STDIN_FILENO;
@@ -726,6 +730,14 @@ static CURLcode operate_do(struct GlobalConfig *global,
                     "fcntl failed on fd=%d: %s\n", infd, strerror(errno));
           }
         }
+#if defined(MSDOS) || defined(WIN32)
+        else if(!GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &mode)) {
+          set_binmode(stdin);
+          warnf(config->global, "Automatically switched stdin to binary mode."
+                                "Please use --upload-file - for file-uploads"
+                                " using pipe-redirection to stdin.\n");
+        }
+#endif /* MSDOS || WIN32 */
 
         if(uploadfile && config->resume_from_current)
           config->resume_from = -1; /* -1 will then force get-it-yourself */
