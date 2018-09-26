@@ -567,6 +567,49 @@ void tool_version_info(void)
     printf("Metalink ");
 #endif
     puts(""); /* newline */
+#ifdef CURLDEBUG
+#ifdef __W32API_VERSION
+    printf("__W32API_VERSION: %f\n", __W32API_VERSION);
+#else
+    printf("__W32API_VERSION: undefined\n");
+#endif
+#ifdef __W32API_MAJOR_VERSION
+    printf("__W32API_MAJOR_VERSION: %d\n", __W32API_MAJOR_VERSION);
+#else
+    printf("__W32API_MAJOR_VERSION: undefined\n");
+#endif
+#ifdef __W32API_MINOR_VERSION
+    printf("__W32API_MINOR_VERSION: %d\n", __W32API_MINOR_VERSION);
+#else
+    printf("__W32API_MINOR_VERSION: undefined\n");
+#endif
+#ifdef __W32API_PATCHLEVEL
+    printf("__W32API_PATCHLEVEL: %d\n", __W32API_PATCHLEVEL);
+#else
+    printf("__W32API_PATCHLEVEL: undefined\n");
+#endif
+#ifdef __MINGW32__
+    printf("__MINGW32__: %d\n", __MINGW32__);
+#else
+    printf("__MINGW32__: undefined\n");
+#endif
+#ifdef __MINGW32_VERSION
+    printf("__MINGW32_VERSION: %f\n", __MINGW32_VERSION);
+#else
+    printf("__MINGW32_VERSION: undefined\n");
+#endif
+#ifdef __MINGW32_MAJOR_VERSION
+    printf("__MINGW32_MAJOR_VERSION: %d\n", __MINGW32_MAJOR_VERSION);
+#else
+    printf("__MINGW32_MAJOR_VERSION: undefined\n");
+#endif
+#ifdef __MINGW32_MINOR_VERSION
+    printf("__MINGW32_MINOR_VERSION: %d\n", __MINGW32_MINOR_VERSION);
+#else
+    printf("__MINGW32_MINOR_VERSION: undefined\n");
+#endif
+    puts(""); /* newline */
+#endif
   }
 }
 
