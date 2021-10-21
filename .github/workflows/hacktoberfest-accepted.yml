@@ -1,0 +1,40 @@
+name: Hacktoberfest
+
+on:
+  push:
+    branches:
+      - master
+
+# TODO: replace hacktobertest with hacktoberfest (test with fest) before merge!
+jobs:
+  # add hacktoberfest-accepted label to PRs closed by a commit on master
+  merged:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Login to GitHub CLI
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+      - name: Search relevant commit message lines starting with Closes/Merges
+        run: |
+          git log --format=email ${{ github.event.before }}..${{ github.event.after }} > history.log
+          grep "^Closes " history.log > accepted.log
+          grep "^Merges " history.log >> accepted.log
+
+      - name: Search for Number-based PR references
+        run: |
+          egrep -o "#(\d+)" accepted.log | cut -d# -f2 | sort | uniq | xargs -n1 -I{} \
+            gh pr view {} --json number,labels \
+              --jq '{number, label: .labels[].name} | [.number, .label] | join(":")' | \
+            egrep -o '^(\d+):hacktobertest$' | sort | uniq | xargs -n1 -I {} \
+              gh pr edit {} --remove-label 'hacktobertest' --add-label 'hacktobertest-accepted'
+
+      - name: Search for URL-based PR references
+        run: |
+          egrep -o "github.com/(.+)/(.+)/pull/(\d+)" accepted.log | sort | uniq | xargs -n1 -I{} \
+            gh pr view "https://{}" --json number,labels \
+              --jq '{number, label: .labels[].name} | [.number, .label] | join(":")' | \
+            egrep -o '^(\d+):hacktobertest$' | sort | uniq | xargs -n1 -I {} \
+              gh pr edit {} --remove-label 'hacktobertest' --add-label 'hacktobertest-accepted'
