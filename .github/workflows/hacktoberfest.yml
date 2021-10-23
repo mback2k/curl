@@ -1,0 +1,32 @@
+name: Hacktoberfest
+
+on:
+  # run for newly opened pull requests
+  pull_request:
+    types:
+      - opened
+
+jobs:
+  # add hacktoberfest label starting from September 30th till November 1st
+  opened:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Check wether repo participates in Hacktoberfest
+        run: |
+          gh config set prompt disabled && echo "::set-output name=label::$(
+            gh repo view --json repositoryTopics --jq '.repositoryTopics[].name' | grep '^hacktoberfest$')"
+        id: check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add label to PRs opened within timeframe
+        run: gh pr edit ${{ github.event.pull_request.number }} --add-label 'hacktoberfest'
+        if: |
+          steps.check.outputs.label == 'hacktoberfest' && (
+            contains(github.event.pull_request.created_at, '-09-30T') ||
+            contains(github.event.pull_request.created_at, '-10-')    ||
+            contains(github.event.pull_request.created_at, '-11-01T') )
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
