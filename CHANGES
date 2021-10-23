@@ -5,3 +5,5 @@ Generate a CHANGES file like the one present in every release like this:
 
 $ git log --pretty=fuller --no-color --date=short --decorate=full | \
   ./scripts/log2changes.pl
+
+TEST
